@@ -227,6 +227,13 @@ window.addEventListener("DOMContentLoaded", () => {
     if (topMat) {
       const colorArray = hexToRgbArray(topColor.value);
       topMat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
+      topMat.pbrMetallicRoughness.setMetallicFactor(0);
+      topMat.pbrMetallicRoughness.setRoughnessFactor(1);
+
+      // Remove any existing texture on the lid
+      if (topMat.pbrMetallicRoughness.baseColorTexture) {
+        topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+      }
     }
   });
 
@@ -531,7 +538,7 @@ window.addEventListener("DOMContentLoaded", () => {
       topColor.value = "#ffffff";
       bgColor.value = "#ffffff";
 
-      modelbg.style.backgroundColor = "white";
+      modelbg.style.backgroundColor = "#F2F2F2";
       checkFormValidity();
 
       // Reset model materials
@@ -563,12 +570,16 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("topColorImg").addEventListener("click", function () {
     document.getElementById("topColor").click();
   });
+
+
   document.getElementById("topColor").addEventListener("input", function (e) {
     const pickedColor = e.target.value;
     const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
     if (topMat) {
       const rgb = hexToRgbArray(pickedColor);
       topMat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1]);
+      topMat.pbrMetallicRoughness.setMetallicFactor(0);
+      topMat.pbrMetallicRoughness.setRoughnessFactor(1);
     }
   });
 
@@ -753,7 +764,8 @@ window.addEventListener("DOMContentLoaded", () => {
       mv.setAttribute("interaction-prompt", "none");
       mv.setAttribute("camera-orbit", model.angles[0].cameraOrbit);
       mv.setAttribute("field-of-view", "25deg");
-      mv.setAttribute("shadow-intensity", "0.5");
+      mv.setAttribute("shadow-intensity", "0");
+      mv.removeAttribute('environment-image');
       mv.setAttribute("exposure", "1");
 
       const label = document.createElement('div');
@@ -845,6 +857,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const selectedAngle = models[selectedModelIndex].angles[selectedAngleIndex];
     mainModelViewer.setAttribute('src', selectedAngle.src);
     mainModelViewer.setAttribute('min-camera-orbit', selectedAngle.minCameraOrbit);
+    mainModelViewer.setAttribute('shadow-intensity', '0'); // Add this
+    mainModelViewer.setAttribute('exposure', '1'); // Add this
 
     // Parse the stored camera orbit to get rotation angles
     const orbitParts = selectedAngle.cameraOrbit.split(' ');
