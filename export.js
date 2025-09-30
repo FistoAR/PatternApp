@@ -222,20 +222,21 @@ window.addEventListener("DOMContentLoaded", () => {
     modelbg.style.backgroundColor = bgColor.value;
   });
 
-  topColor.addEventListener("input", () => {
-    const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
-    if (topMat) {
-      const colorArray = hexToRgbArray(topColor.value);
-      topMat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
-      topMat.pbrMetallicRoughness.setMetallicFactor(0);
-      topMat.pbrMetallicRoughness.setRoughnessFactor(1);
-
-      // Remove any existing texture on the lid
-      if (topMat.pbrMetallicRoughness.baseColorTexture) {
-        topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
-      }
+topColor.addEventListener("input", () => {
+  const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
+  if (topMat) {
+    const colorArray = hexToRgbArray(topColor.value);
+    topMat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
+    topMat.pbrMetallicRoughness.setMetallicFactor(0);
+    topMat.pbrMetallicRoughness.setRoughnessFactor(1);
+    topMat.setAlphaMode("OPAQUE"); // Force opaque
+    
+    // Remove any existing texture on the lid
+    if (topMat.pbrMetallicRoughness.baseColorTexture) {
+      topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
     }
-  });
+  }
+});
 
   function checkFormValidity() {
     renderBtn.disabled = false;
@@ -572,16 +573,16 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
 
-  document.getElementById("topColor").addEventListener("input", function (e) {
-    const pickedColor = e.target.value;
-    const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
-    if (topMat) {
-      const rgb = hexToRgbArray(pickedColor);
-      topMat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1]);
-      topMat.pbrMetallicRoughness.setMetallicFactor(0);
-      topMat.pbrMetallicRoughness.setRoughnessFactor(1);
-    }
-  });
+  // document.getElementById("topColor").addEventListener("input", function (e) {
+  //   const pickedColor = e.target.value;
+  //   const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
+  //   if (topMat) {
+  //     const rgb = hexToRgbArray(pickedColor);
+  //     topMat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1]);
+  //     topMat.pbrMetallicRoughness.setMetallicFactor(0);
+  //     topMat.pbrMetallicRoughness.setRoughnessFactor(1);
+  //   }
+  // });
 
   // BG color picker via image
   document.getElementById("bgColorImg").addEventListener("click", function () {
@@ -859,6 +860,7 @@ window.addEventListener("DOMContentLoaded", () => {
     mainModelViewer.setAttribute('min-camera-orbit', selectedAngle.minCameraOrbit);
     mainModelViewer.setAttribute('shadow-intensity', '0'); // Add this
     mainModelViewer.setAttribute('exposure', '1'); // Add this
+    mainModelViewer.setAttribute('environment-image', 'neutral');
 
     // Parse the stored camera orbit to get rotation angles
     const orbitParts = selectedAngle.cameraOrbit.split(' ');
