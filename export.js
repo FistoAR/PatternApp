@@ -690,7 +690,7 @@ window.addEventListener("DOMContentLoaded", () => {
       frontSrc: './assets/Model_Export/500ml Round A-1 .glb',
       angles: [
         { name: 'Front', src: './assets/Model_Export/500ml Round A-1 .glb', cameraOrbit: '0deg 75deg 0.3644m', minCameraOrbit: '-Infinity auto 0.55m' },
-        { name: 'Side', src: './assets/Model_Export/500ml Round A-2 .glb', cameraOrbit: '20deg 87deg 0.7649m', minCameraOrbit: '-Infinity auto 0.55m' },
+        { name: 'Side', src: './assets/Model_Export/500ml Round A-2 .glb', cameraOrbit: '10deg 78deg  0.7649m', minCameraOrbit: '-Infinity auto 0.55m' },
         { name: 'Back', src: './assets/Model_Export/500ml Round A-3 .glb', cameraOrbit: '-340.4999816894526deg 84.49deg 0.7649m', minCameraOrbit: '-Infinity auto 0.65m' }
       ]
     },
