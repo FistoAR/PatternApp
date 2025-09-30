@@ -23,13 +23,13 @@ window.addEventListener("DOMContentLoaded", () => {
   // let currentScrollRotation = 0;
   let isScrolling = false;
   let scrollTimeout;
-  
 
- // Zoom levels - only 2 steps
-const zoomLevels = [0.7649, 0.55]; // [normal, slightly zoomed in]
-let currentZoomIndex = 0;
-let currentZoom = 0.7649; // Initialize with default zoom
-let originalBottomTexture = null;
+
+  // Zoom levels - only 2 steps
+  const zoomLevels = [0.7649, 0.55]; // [normal, slightly zoomed in]
+  let currentZoomIndex = 0;
+  let currentZoom = 0.7649; // Initialize with default zoom
+  let originalBottomTexture = null;
 
   modelViewer.addEventListener("load", () => {
     const bottomMat = modelViewer.model?.materials?.find(m => m.name === materialName);
@@ -43,37 +43,37 @@ let originalBottomTexture = null;
   //   modelViewer.setAttribute("camera-orbit", `${rotationY}deg 84.49deg 0.7649m`);
   // }
 
-function handleScroll(event) {
-  event.preventDefault();
+  function handleScroll(event) {
+    event.preventDefault();
 
-  const zoomSensitivity = 0.0005;
-  const zoomDelta = event.deltaY * zoomSensitivity;
-  
-  // Define min and max zoom
-  const minDistance = 0.55; // max zoom in
-  const maxDistance = 0.7649; // max zoom out (base)
-  
-  // Update zoom distance
-  currentZoom += zoomDelta;
-  currentZoom = Math.max(minDistance, Math.min(maxDistance, currentZoom));
-  
-  // Get current rotation angles from the viewer
-  const currentOrbit = modelViewer.getAttribute("camera-orbit").split(' ');
-  
-  // Update camera with new zoom, keeping current rotation
-  modelViewer.setAttribute("camera-orbit", `${currentOrbit[0]} ${currentOrbit[1]} ${currentZoom}m`);
-  
-  if (!isScrolling) {
-    isScrolling = true;
-    document.body.style.cursor = "grabbing";
+    const zoomSensitivity = 0.0005;
+    const zoomDelta = event.deltaY * zoomSensitivity;
+
+    // Define min and max zoom
+    const minDistance = 0.55; // max zoom in
+    const maxDistance = 0.7649; // max zoom out (base)
+
+    // Update zoom distance
+    currentZoom += zoomDelta;
+    currentZoom = Math.max(minDistance, Math.min(maxDistance, currentZoom));
+
+    // Get current rotation angles from the viewer
+    const currentOrbit = modelViewer.getAttribute("camera-orbit").split(' ');
+
+    // Update camera with new zoom, keeping current rotation
+    modelViewer.setAttribute("camera-orbit", `${currentOrbit[0]} ${currentOrbit[1]} ${currentZoom}m`);
+
+    if (!isScrolling) {
+      isScrolling = true;
+      document.body.style.cursor = "grabbing";
+    }
+
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      isScrolling = false;
+      document.body.style.cursor = "default";
+    }, 150);
   }
-
-  clearTimeout(scrollTimeout);
-  scrollTimeout = setTimeout(() => {
-    isScrolling = false;
-    document.body.style.cursor = "default";
-  }, 150);
-}
 
 
   // modelViewer.addEventListener("wheel", handleScroll, { passive: false });
@@ -684,7 +684,7 @@ function handleScroll(event) {
 
   toggleClearButtonState();
 
- const models = [
+  const models = [
     {
       name: '500ml Model',
       frontSrc: './assets/Model_Export/500ml Round A-1 .glb',
@@ -784,7 +784,9 @@ function handleScroll(event) {
 
       highlightSelected(modelContainer, 0);
       renderAngles();
-      highlightSelected(angleContainer, 0);
+      setTimeout(() => {
+        highlightSelected(angleContainer, 0);
+      }, 100);
       updateMainViewer();
     }
   }
@@ -837,25 +839,25 @@ function handleScroll(event) {
     });
   }
 
-   function updateMainViewer() {
-  if (selectedModelIndex === null || selectedAngleIndex === null) return;
+  function updateMainViewer() {
+    if (selectedModelIndex === null || selectedAngleIndex === null) return;
 
-  const selectedAngle = models[selectedModelIndex].angles[selectedAngleIndex];
-  mainModelViewer.setAttribute('src', selectedAngle.src);
-  mainModelViewer.setAttribute('min-camera-orbit', selectedAngle.minCameraOrbit);
-  
-  // Parse the stored camera orbit to get rotation angles
-  const orbitParts = selectedAngle.cameraOrbit.split(' ');
-  const rotationX = orbitParts[0]; // e.g., '0deg'
-  const rotationY = orbitParts[1]; // e.g., '75deg'
-  
-  // Reset zoom to default when changing models/angles
-  currentZoom = zoomLevels[0];
-  currentZoomIndex = 0;
-  
-  // Apply stored rotation with current zoom level
-  mainModelViewer.setAttribute('camera-orbit', `${rotationX} ${rotationY} ${currentZoom}m`);
-}
+    const selectedAngle = models[selectedModelIndex].angles[selectedAngleIndex];
+    mainModelViewer.setAttribute('src', selectedAngle.src);
+    mainModelViewer.setAttribute('min-camera-orbit', selectedAngle.minCameraOrbit);
+
+    // Parse the stored camera orbit to get rotation angles
+    const orbitParts = selectedAngle.cameraOrbit.split(' ');
+    const rotationX = orbitParts[0]; // e.g., '0deg'
+    const rotationY = orbitParts[1]; // e.g., '75deg'
+
+    // Reset zoom to default when changing models/angles
+    currentZoom = zoomLevels[0];
+    currentZoomIndex = 0;
+
+    // Apply stored rotation with current zoom level
+    mainModelViewer.setAttribute('camera-orbit', `${rotationX} ${rotationY} ${currentZoom}m`);
+  }
 
 
   function highlightSelected(container, index) {
