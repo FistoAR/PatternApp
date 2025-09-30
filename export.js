@@ -698,7 +698,7 @@ window.addEventListener("DOMContentLoaded", () => {
       name: '250ml Model',
       frontSrc: './assets/Model_Export/250  SB A-1.glb',
       angles: [
-        { name: 'Front', src: './assets/Model_Export/250  SB A-1.glb', cameraOrbit: '0deg 90deg 0.5m', minCameraOrbit: '-Infinity auto 1.15m' },
+        { name: 'Front', src: './assets/Model_Export/250  SB A-1.glb', cameraOrbit: '340deg 68deg 0.5m', minCameraOrbit: '-Infinity auto 1.15m' },
         { name: 'Side', src: './assets/Model_Export/250  SB A-2.glb', cameraOrbit: '337deg 68deg 0.5m', minCameraOrbit: '-Infinity auto 1.15m' },
         { name: 'Back', src: './assets/Model_Export/250  SB A-3.glb', cameraOrbit: '320deg 70deg 0.65m', minCameraOrbit: '-Infinity auto 1.49m' }
       ]
