@@ -536,7 +536,7 @@ window.addEventListener("DOMContentLoaded", () => {
       topColor.value = "#ffffff";
       bgColor.value = "#ffffff";
 
-      modelbg.style.backgroundColor = "#F2F2F2";
+      modelbg.style.backgroundColor = "#c7c7c7";
       checkFormValidity();
 
       // Reset model materials
