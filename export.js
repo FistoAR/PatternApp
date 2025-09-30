@@ -222,21 +222,18 @@ window.addEventListener("DOMContentLoaded", () => {
     modelbg.style.backgroundColor = bgColor.value;
   });
 
-topColor.addEventListener("input", () => {
-  const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
-  if (topMat) {
-    const colorArray = hexToRgbArray(topColor.value);
-    topMat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
-    topMat.pbrMetallicRoughness.setMetallicFactor(0);
-    topMat.pbrMetallicRoughness.setRoughnessFactor(1);
-    topMat.setAlphaMode("OPAQUE"); // Force opaque
-    
-    // Remove any existing texture on the lid
-    if (topMat.pbrMetallicRoughness.baseColorTexture) {
-      topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+  topColor.addEventListener("input", () => {
+    const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
+    if (topMat) {
+
+      topMat.setAlphaMode('OPAQUE');
+      topMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+      topMat.pbrMetallicRoughness.setBaseColorFactor(topColor.value); 
+      topMat.pbrMetallicRoughness.setRoughnessFactor(0.5); 
+      topMat.pbrMetallicRoughness.setMetallicFactor(0.2);
+
     }
-  }
-});
+  });
 
   function checkFormValidity() {
     renderBtn.disabled = false;
@@ -768,6 +765,8 @@ topColor.addEventListener("input", () => {
       mv.setAttribute("shadow-intensity", "0");
       mv.removeAttribute('environment-image');
       mv.setAttribute("exposure", "1");
+
+
 
       const label = document.createElement('div');
       label.textContent = model.name;
