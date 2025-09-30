@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="shortcut icon"
+      href="./assets/Logo/logo-icon.png"
+      type="image/x-icon"
+    />
+    <link rel="stylesheet" href="./css/fontawesome.min.css" />
+    <link rel="stylesheet" href="./css/solid.min.css" />
+    <link rel="stylesheet" href="./css/regular.min.css" />
+    <link rel="stylesheet" href="./css/svg-with-js.min.css" />
+    <link rel="stylesheet" href="exportpdf.css" />
+    <script type="module" src="./js/model-viewer.min.js"></script>
+    <script src="./js/html2canvas.min.js"></script>
+    <script src="./js/jspdf.umd.min.js"></script>
+    <title>TerraTechPacks 3D</title>
+  </head>
+  <body>
+    <div class="export_main">
+      <nav class="export_nav">
+        <div>
+          <img
+            src="./assets/Logo/terratechpacks.png"
+            alt="TerraTech_logo"
+            class="nav_logo"
+          />
+        </div>
+        <div>
+          <h3>Dual Perspective Render Capture</h3>
+        </div>
+        <div>
+          <button class="export_btn" id="export_btn" disabled>
+            Export Selected PDF
+          </button>
+        </div>
+      </nav>
+      <div class="export_content">
+        <div class="model_view" id="modelview">
+          <model-viewer
+            id="modelViewer"
+            src="./assets/model.glb"
+            camera-controls
+            exposure="1"
+            shadow-intensity="0.5"
+            disable-tap
+            disable-pan
+            ar
+            interaction-prompt="none"
+            camera-orbit="-540.9deg 84.49deg 0.4649m"
+            field-of-view="45deg"
+          >
+          </model-viewer>
+        </div>
+        <div class="model_inputs">
+          <div class="input-section">
+            <h4>Create New Option</h4>
+            <div class="input-group">
+              <input
+                type="text"
+                id="textureTitle"
+                placeholder="Enter Theme Name"
+              />
+              <input
+                type="file"
+                name="texture"
+                id="textureFile"
+                accept="image/*"
+              />
+            </div>
+            <div class="input-row">
+              <div class="color-control">
+                <label for="topColor">Lid Color:</label>
+                <input type="color" id="topColor" value="#ffffff" />
+              </div>
+              <div class="color-control">
+                <label for="bgColor">BG Color:</label>
+                <input type="color" id="bgColor" value="#f5d2da" />
+              </div>
+            </div>
+            <button class="render_btn" id="renderBtn" disabled>
+              Render Model
+            </button>
+          </div>
+          <div class="custom-logo-upload">
+            <h4>Upload Custom Logo</h4>
+            <input type="file" id="customLogoInput" accept="image/*" />
+            <img
+              id="customLogoPreview"
+              alt="Custom Logo Preview"
+              style="max-width: 150px; margin-top: 10px; display: none"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="render_models">
+        <div style="position: relative; width: 95%; height: 45px">
+          <h4 style="position: absolute; text-align: center; width: 100%">
+            Rendered Models
+          </h4>
+          <div
+            class="selection-controls"
+            style="position: absolute; right: 0; top: 0"
+          >
+            <button class="select-btn" id="selectAllBtn">Select All</button>
+            <button class="select-btn secondary" id="deselectAllBtn">
+              Deselect All
+            </button>
+          </div>
+        </div>
+        <div id="renderedImages"></div>
+      </div>
+      <div id="pdfLoadingOverlay">Generating PDF... Please wait</div>
+    </div>
+    <script src="./export.js"></script>
+  </body>
+</html>

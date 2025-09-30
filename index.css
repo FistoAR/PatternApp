@@ -1,0 +1,120 @@
+:root {
+  --primary: #ffffff;
+}
+/* roboto-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./fonts/roboto-v49-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-500 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  src: url('./fonts/roboto-v49-latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-600 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 600;
+  src: url('./fonts/roboto-v49-latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+* {
+  margin: 0;
+  padding: 0;
+  font-family: "Roboto", sans-serif;
+}
+.main {
+  background-color: var(--primary);
+  height: 100vh;
+}
+
+
+.content {
+  height: 90vh;
+  display: grid;
+  /* background-color:aqua; */
+  grid-template-rows: repeat(5, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.left_side_bar {
+  grid-column: 1/ 2;
+  grid-row: 1/ 6;
+  border-right: 2px solid black;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* background-color: lightblue; */
+  height: 1fr;
+}
+
+
+
+.main_content {
+  grid-column: 2/ 5;
+  grid-row: 1/ 6;
+  /* background-color: lightcoral; */
+}
+
+.Right_side_bar {
+  grid-column: 5/6;
+  grid-row: 1/6;
+  border-left: 2px solid black;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* overflow-y: auto; */
+  /* background-color: rgb(4, 130, 130); */
+}
+#preloader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: white; /* or any background */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 6px solid #ddd;
+  border-top-color: #fbd238;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+.pattern-loader {
+  padding: 10px;
+  text-align: center;
+  font-style: italic;
+  color: #666;
+}
+.pattern-swatch.error {
+  background-color: #eee;
+  color: #c00;
+  padding: 10px;
+  font-size: 12px;
+  text-align: center;
+}
+

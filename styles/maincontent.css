@@ -1,0 +1,180 @@
+/* roboto-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/roboto-v49-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-500 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  src: url('../fonts/roboto-v49-latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-600 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 600;
+  src: url('../fonts/roboto-v49-latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+.model {
+  height: 90%;
+  background-color: "#FFD3D3" ;
+}
+
+.model_view {
+    /* background-color:#FFD3D3; */
+  height: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: auto;
+  /* border-bottom: 2px solid black; */
+}
+
+#mainViewer{
+  /* background: linear-gradient(180deg, #fff, #f7f8fa); */
+  width: 100%;
+  height: 100%;
+}
+
+.model h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.model_file {
+  height: 10%;
+  outline: 2px solid black;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+}
+.parts {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  font-family: Arial, sans-serif;
+}
+
+.parts label {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+#partSelect {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.color-options {
+  display: flex;
+  gap: 6px;
+}
+
+.color-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.color-options input[type="radio"] {
+  accent-color: #007bff;
+}
+
+.export {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+/* Dropdown */
+.export select {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.export select:hover {
+  border-color: #fbd238;
+}
+
+/* Button */
+.export button {
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  background: #fbd238;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.export button:hover {
+  background: #b38c01;
+}
+
+.export button:active {
+  transform: scale(0.95);
+}
+
+.category-section {
+  margin-bottom: 20px;
+}
+
+.category-section h4 {
+  margin: 10px 0;
+  color: #333;
+}
+
+.category-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.colour_picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.colour_picker label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.pickr .pcr-button{
+  visibility: hidden;
+}
+
+/* Removes default styling in browsers */
+.colour_picker input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 8px;
+}
+.colour_picker input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 8px;
+}

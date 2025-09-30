@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="shortcut icon"
+      href="./assets/Logo/logo-icon.png"
+      type="image/x-icon"
+    />
+    <link rel="stylesheet" href="./css/fontawesome.min.css">
+    <link rel="stylesheet" href="./css/solid.min.css">
+    <link rel="stylesheet" href="./css/regular.min.css">
+    <link rel="stylesheet" href="./css/svg-with-js.min.css">
+    <link rel="stylesheet" href="index.css" />
+    <link rel="stylesheet" href="./styles/nav.css" />
+    <link rel="stylesheet" href="./styles/left_sidebar.css" />
+    <link rel="stylesheet" href="./styles/right_sidebar.css" />
+    <link rel="stylesheet" href="./styles/maincontent.css" />
+    <script type="module" src="./js/model-viewer.min.js"></script>
+    <script src="./js/fabric.min.js"></script>
+    <link rel="stylesheet" href="./css/nano.min.css">
+    <script src="./js/pickr.min.js"></script>
+    <title>TerraTechPacks 3D</title>
+  </head>
+  <body>
+    <div class="main" id="main">
+      <nav class="nav">
+        <div>
+          <img
+            src="./assets/Logo/terratechpacks_white.png"
+            alt="TerraTech_logo"
+            class="nav_logo"
+          />
+        </div>
+        <div class="nav_links">
+          <a class="login_btn" target="_blank" href="exportpdf.html">Mock up Generator</a>
+          <a class="login_btn" href="login.html">Login</a>
+        </div>
+      </nav>
+      <div class="content">
+        <div class="left_side_bar">
+          <p>Select Pattern</p>
+          <div class="pattern_box">
+            <div class="pattern_list">
+              <ul class="accordion">
+                <!-- category is injucted from js -->
+              </ul>
+            </div>
+          </div>
+          <p>Upload Logo</p>
+          <div class="upload_box">
+            <label for="logoUpload" class="upload-box" id="dropArea">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <p style="margin-top: 10px">Upload Logo Here</p>
+              <input type="file" id="logoUpload" accept="image/*" />
+            </label>
+            <button class="edit_btn">Edit</button>
+          </div>
+          <!-- Modal -->
+          <div id="editModal" class="modal">
+            <div class="modal-content">
+              <div class="modal_header">
+                <span class="close-button"
+                  ><i class="fa-solid fa-xmark"></i
+                ></span>
+                <h3>Edit Logo</h3>
+              </div>
+              <div class="modal_body" id="model_body">
+                <div
+                  id="previewWrapper"
+                  style="
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    overflow: hidden;
+                  "
+                >
+                  <!-- Loader -->
+                  <div
+                    id="previewLoader"
+                    style="
+                      display: none;
+                      position: absolute;
+                      top: 50%;
+                      left: 50%;
+                      transform: translate(-50%, -50%);
+                      z-index: 10;
+                    "
+                  >
+                    <div class="loader"></div>
+                  </div>
+                  <!-- Fabric canvas for drawing -->
+                  <canvas id="fabricCanvas"></canvas>
+                </div>
+              </div>
+              <div class="modal_footer">
+                <button id="saveLogoBtn" class="save_btn">Save</button>
+                <label for="uploadBtn" class="upload_btn">Upload Logo</label>
+                <input
+                  type="file"
+                  id="uploadBtn"
+                  name="file"
+                  hidden
+                  accept="image/png"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="main_content">
+          <div class="model" id="modelcontainer">
+            <div
+              style="
+                height: 10%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <h3 id="mainModelTitle">120ml Round Container</h3>
+            </div>
+            <div class="model_view">
+              <model-viewer
+                id="mainViewer"
+                src="./assets/Model_with_logo/120ml round with logo.glb"
+                alt="120ml Round Container"
+                camera-controls
+                auto-rotate
+                exposure="1"
+                rotation-per-second="60deg"
+                shadow-intensity="0.5"
+                disable-tap
+                disable-pan
+                ar
+                interaction-prompt="none"
+              >
+              </model-viewer>
+            </div>
+          </div>
+
+          <div class="model_file">
+            <div class="parts">
+              <select id="partSelect">
+                <option selected value="lid">Lid</option>
+                <option value="tub">Tub</option>
+              </select>
+
+              <div id="colorOptions" class="color-options">
+                <!-- Dynamic radio buttons will be inserted here -->
+              </div>
+            </div>
+            <div class="colour_picker">
+              <label>Background:</label>
+              <div id="bgColorPickerTrigger">
+                <img src="./assets/pngwing.png" alt="wheel" style="width: 35px; height: 35px; cursor: pointer;" />
+                <!-- Hidden element for Pickr -->
+              </div><div id="bgColorPicker" style="display: none;"></div>
+            </div>
+            <div class="export">
+              <select id="exportFormat">
+                <option value="png">PNG</option>
+                <option value="jpg">JPG</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <button id="exportBtn">Export</button>
+            </div>
+          </div>
+        </div>
+        <div class="Right_side_bar">
+          <p>Select Model</p>
+          <!-- thumbnails -->
+          <div class="thumbs">
+            <div class="thumb-grid" id="thumbGrid">
+              <!-- thumbnails injected by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Preloader Spinner -->
+      <div id="preloader">
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <script src="./js/jspdf.umd.min.js"></script>
+    <script src="model.js"></script>
+  </body>
+</html>

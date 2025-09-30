@@ -1,0 +1,362 @@
+/* roboto-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/roboto-v49-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-500 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  src: url('../fonts/roboto-v49-latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-600 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 600;
+  src: url('../fonts/roboto-v49-latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+.pattern_box {
+  height: 70%;
+  /* background-color: red; */
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.upload_box {
+  height: 30%;
+}
+
+.left_side_bar p {
+  font-size: 18px;
+  font-weight: bold;
+  color: rgb(167, 167, 1);
+}
+
+.accordion {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px 0;
+  margin-top: 10px;
+}
+
+/* Main category button */
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: all 0.3s;
+  /* border: 1px solid #ccc; */
+}
+
+.accordion-header:hover {
+  border: 1px solid #ccc;
+  background: #f9f9f9;
+}
+
+.accordion-header.active {
+  border: 1px solid #000;
+}
+
+.accordion-header span {
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.accordion-header i {
+  font-style: normal;
+  font-size: 18px;
+  width: 30px;
+  color: #323232;
+  /* background-color: red; */
+}
+
+/* Dropdown content */
+/* Accordion content (collapsed by default) */
+.accordion-content {
+  max-height: 0;               /* collapsed */
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  margin-left: 10px;
+  padding: 0 10px;             /* padding only horizontal when collapsed */
+  display: block;              /* keep it block, control via max-height */
+}
+
+/* Active (expanded) */
+.accordion-content.active {
+  max-height: 500px;           /* enough space to show patterns */
+  padding: 10px;               /* restore padding */
+  overflow-y: auto;            /* enable scroll if content too tall */
+}
+
+/* Links inside content */
+.accordion-content a {
+  display: block;
+  padding: 8px 12px;
+  text-decoration: none;
+  color: #000;
+  font-size: 14px;
+}
+
+.accordion-content a:hover {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.accordion-content a span {
+  color: #666;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* Pattern swatches */
+.pattern-swatch {
+  width: 70px;
+  height: 70px;
+  border-radius: 8px;
+  margin: 5px;
+  display: inline-block;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  position: relative;
+  border: 1px solid black;
+}
+
+.pattern-swatch.selected {
+  border: 2px solid #007bff;
+}
+
+
+/* Modal overlay */
+.modal {
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  
+  display: flex; /* Center content */
+  justify-content: center;
+  align-items: center;
+
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+/* When active */
+.modal.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Modal content box */
+.modal-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  width: 90vw;
+  height: 80vh;
+  max-width: 1000px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: auto;
+  transform: scale(0.9);
+  opacity: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease;
+}
+/* Animate in when modal is shown */
+.modal.show .modal-content {
+  transform: scale(1);
+  opacity: 1;
+}
+/* Close button */
+.close-button {
+  color: #aaa;
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.close-button:hover {
+  color: #000;
+}
+
+.modal_header{
+  height: 10%;
+  /* background-color: red; */
+}
+.modal_body{
+  height: 80%;
+  /* overflow: hidden; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#previewWrapper{
+  width: 100%;
+  height: 100%;
+}
+/* #previewImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+} */
+ #fabricCanvas{
+  height: 100%;
+  width: 100%;
+ }
+ #baseImage {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+#logoOverlay.active {
+  outline: 2px solid #fbd238; /* blue outline */
+  /* or use box-shadow for glow */
+  /* box-shadow: 0 0 8px #007BFF; */
+}
+
+.modal_footer{
+  height: 10%;
+  display: flex;
+  align-items: end;
+  justify-content: end;
+  gap: 0 15px;
+}
+.save_btn,.upload_btn {
+  border: none;
+  padding: 10px 20px;
+  border-radius: 7px;
+  background-color: #fbd238;
+  cursor: pointer;
+  box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
+  transition: 1s;
+  font-size: 15px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: black;
+}
+.save_btn:hover {
+  transition: 1s;
+  box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+}
+.loader {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #333;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.upload-box {
+  border: 2px dashed #000000;
+  border-radius: 12px;
+  padding: 20px 60px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #c6c6c6;
+  transition: background 0.3s, border-color 0.3s;
+  cursor: pointer;
+}
+
+.upload-box.dragover {
+  background: #f9ffe0;
+  border-color: #000000;
+}
+
+.upload-box i {
+  font-size: 30px;
+  color: #000000;
+  margin-bottom: 10px;
+}
+
+.upload-box p {
+  color: #000000;
+  font-size: 14px;
+  margin: 0;
+}
+
+input[type="file"] {
+  display: none;
+}
+
+.edit_btn{
+  border: none;
+  margin-top: 10px;
+  height: 40px;
+  width: 100%;
+  border-radius: 7px;
+  background-color: #fbd238;
+  cursor: pointer;
+  box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
+  transition: 1s;
+  font-size: 15px;
+  font-weight: 500;
+}

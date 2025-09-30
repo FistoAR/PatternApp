@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pattern Upload</title>
+    <link rel="stylesheet" href="pattern.css" />
+    <link rel="stylesheet" href="./css/fontawesome.min.css">
+    <link rel="stylesheet" href="./css/solid.min.css">
+    <link rel="stylesheet" href="./css/regular.min.css">
+    <link rel="stylesheet" href="./css/svg-with-js.min.css">
+  </head>
+  <body>
+    <div class="container">
+      <h1>Pattern Upload</h1>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="category-select">Select Category</label>
+          <select id="category-select">
+            <option value="">-- Select Category --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="pattern-file">Select Pattern Image</label>
+          <input type="file" id="pattern-file" accept="image/*" />
+        </div>
+      </div>
+
+      <img
+        id="preview-image"
+        src=""
+        alt="Preview"
+        style="
+          display: none;
+          margin-bottom: 15px;
+          max-width: 200px;
+          max-height: 150px;
+        "
+      />
+
+      <button id="upload-btn" type="button">Upload Pattern</button>
+
+      <div class="message" id="message"></div>
+
+      <h3 style="margin-bottom: 10px;">Uploaded Patterns</h3>
+      <div class="table-container">
+        <table class="pattern-table">
+          <thead>
+            <tr>
+              <th>S.No.</th>
+              <th>Category</th>
+              <th>Pattern</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="pattern-table-body">
+            <tr>
+              <td colspan="4">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

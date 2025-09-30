@@ -1,0 +1,117 @@
+/* roboto-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./fonts/roboto-v49-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-500 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  src: url('./fonts/roboto-v49-latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* roboto-600 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 600;
+  src: url('./fonts/roboto-v49-latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  border-radius: 10px;
+  padding: 30px;
+}
+h1 {
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+.form{
+    display: flex;
+}
+label {
+  display: block;
+  margin: 10px 0 5px;
+  font-weight: bold;
+}
+select,
+input[type="file"],
+button {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  font-size: 1rem;
+}
+button {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+button:hover {
+  background-color: #45a049;
+}
+.message {
+  text-align: center;
+  margin-top: 10px;
+  font-weight: bold;
+}
+.table-container {
+  max-height: 350px;   /* adjust height as needed */
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  scrollbar-width: none;
+}
+
+.pattern-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.pattern-table th,
+.pattern-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.pattern-table th {
+  position: sticky;
+  top: 0;
+  background: #f8f8f8;  /* keep visible on scroll */
+  z-index: 2;           /* stays above body rows */
+}
+
+.patternimg{
+  border: 1px solid black;
+}
+
+.trash {
+  cursor: pointer;
+  color: red;
+}
+.form-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+  align-items: flex-end;
+}
+
+.form-group {
+  flex: 1;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+}

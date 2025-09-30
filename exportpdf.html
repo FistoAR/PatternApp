@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="shortcut icon" href="./assets/Logo/logo-icon.png" type="image/x-icon" />
+  <link rel="stylesheet" href="./css/fontawesome.min.css" />
+  <link rel="stylesheet" href="./css/solid.min.css" />
+  <link rel="stylesheet" href="./css/regular.min.css" />
+  <link rel="stylesheet" href="./css/svg-with-js.min.css" />
+  <link rel="stylesheet" href="exportpdf.css" />
+  <script type="module" src="./js/model-viewer.min.js"></script>
+  <script src="./js/html2canvas.min.js"></script>
+  <script src="./js/jspdf.umd.min.js"></script>
+  <title>TerraTechPacks 3D</title>
+</head>
+
+<body>
+  <div class="export_main">
+    <nav class="export_nav">
+      <div>
+        <img src="./assets/Logo/terratechpacks_white.png" alt="TerraTech_logo" class="nav_logo" />
+      </div>
+      <div>
+        <h3 style="color: aliceblue">Dual Perspective Render Capture</h3>
+      </div>
+      <div>
+        <button class="export_btn" id="export_btn" disabled>
+          Export Selected PDF
+        </button>
+      </div>
+    </nav>
+    <div class="export_content_box">
+      <div class="model_box">
+        <div class="model_view" id="modelview">
+
+          <model-viewer id="modelViewer" src="./assets/Model_Export/500ml Round A-1 .glb" camera-controls=""
+            exposure="1" shadow-intensity="0.5" disable-tap="" disable-pan="" ar="" interaction-prompt="none"
+            min-field-of-view="14deg" max-field-of-view="20deg" ar-status="not-presenting"
+            camera-orbit="0deg 75deg 0.7649m">
+          </model-viewer>
+
+        </div>
+        <div class="model_angle">
+          <p style="text-align: center; margin: 10px 0; font-weight: bold;">Angles</p>
+          <div class="angle-models">
+            <div id="angleCardContainer"></div>
+          </div>
+        </div>
+        <div class="model_models">
+          <p style="text-align: center; margin: 10px 0; font-weight: bold;">Model List</p>
+          <div id="modelcardContainer"></div>
+        </div>
+      </div>
+      <div class="export_inputs">
+        <div class="export_logo">
+          <div class="custom-logo-upload">
+            <h4>Upload Custom Logo</h4>
+            <input type="file" id="customLogoInput" accept="image/*" />
+            <div class="logos">
+              <img id="customLogoPreview" alt="Custom Logo Preview"
+                style="max-width: 150px; margin-top: 10px; display: none" />
+
+            </div>
+          </div>
+        </div>
+        <div class="model_input">
+          <div class="input-section">
+            <div style="display: flex; align-items: center; justify-content: space-between; height: 15%;">
+              <h4>Create New Option</h4>
+              <button class="render_btn" id="renderBtn" style="font-size: 0.9vw; padding: 0.4vw 1vw;">
+                Export
+              </button>
+            </div>
+            <div class="input-group">
+              <div style="display: flex; flex-direction: column; gap:0.5vw;">
+                <label for="textureTitle"
+                  style="display: flex; flex-direction: column; font-weight: bold; font-size: 0.9vw; gap: 0.4vw;">
+                  <span>Texture Name <span style="color: red;">*</span></span>
+                  <input type="text" id="textureTitle" placeholder="Enter Theme Name" style="width: 70%;" />
+                  <span id="titleWarning" style="color: red; font-size: 0.7vw; display: none;">Please enter the texture
+                    name</span>
+                </label>
+
+                <label for="textureFile"
+                  style="display: flex; flex-direction: column; font-weight: bold; font-size: 0.9vw; gap: 0.4vw;">
+                  <span>Upload Texture <span style="color: red;">*</span></span>
+                  <div style="display: flex; align-items: center; gap: 1vw;">
+                    <input type="file" name="texture" id="textureFile" accept="image/*" style="display: none;" />
+                    <label for="textureFile" class="file-upload"
+                      style="cursor: pointer; padding: 0.3vw 0.7vw; background: #007bff; max-width: 40%; min-width: 35%; color: white; border-radius: 4px; width: 35%; font-size: 0.85vw; display: flex; justify-content: center; align-items: center;">Choose
+                      File</label>
+                    <span id="fileName" style="font-size: 0.8vw; color: #555;">No file chosen</span>
+                  </div>
+                  <span id="fileWarning" style="color: red; font-size: 0.7vw; display: none;">Please upload a texture
+                    file</span>
+                </label>
+              </div>
+            </div>
+            <div class="input-row">
+              <div class="color-control">
+                <label for="topColor">Lid Color:</label>
+                <input type="color" id="topColor" value="#ffffff" style="visibility:hidden;width:0;height:0;" />
+                <img id="topColorImg" src="./assets/pngwing.png" style="width:35px;height:35px;cursor:pointer;" />
+              </div>
+              <div class="color-control">
+                <label for="bgColor">BG Color:</label>
+                <input type="color" id="bgColor" value="#ffffff" style="visibility:hidden;width:0;height:0;" />
+                <img id="bgColorImg" src="./assets/pngwing.png" style="width:35px;height:35px;cursor:pointer;" />
+              </div>
+            </div>
+            <!-- <p style="text-align: center; margin-bottom: 10px; font-weight: bold;">Select logo on PDF</p>
+            <div id="logoSelection">
+              <img src="./assets/Logo/terratechpacks.png" alt="Logo 1" class="selectable-logo"
+                style="width: 80px; cursor: pointer;" />
+              <img src="./assets/Logo/terratechpacks_white.png" alt="Logo 2" class="selectable-logo"
+                style="width: 80px; cursor: pointer;" />
+              <img src="./assets/Logo/white.png" alt="Logo 3" class="selectable-logo"
+                style="width: 80px; cursor: pointer;" />
+            </div> -->
+          </div>
+
+        </div>
+        <div class="model_renders">
+          <div class="render_models">
+            <div style="position: relative; width: 95%; height: 10%">
+              <h4 style="position: absolute; text-align: center; width: 100%">
+                Rendered Models
+              </h4>
+              <div style="position: absolute; right: 0; top: 0;">
+                <label>
+                  <input type="checkbox" id="selectAllToggle" checked />
+                  Select All
+                </label>
+                <!-- Clear All Button -->
+                <button id="clearAllBtn">Clear All</button>
+              </div>
+            </div>
+            <div id="renderedImages" style="height: 90%; overflow: hidden;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="pdfLoadingOverlay">Generating PDF... Please wait</div>
+  </div>
+  <script src="./export.js"></script>
+</body>
+
+</html>

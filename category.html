@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="category.css" />
+  <link rel="stylesheet" href="./css/fontawesome.min.css">
+  <link rel="stylesheet" href="./css/solid.min.css">
+  <link rel="stylesheet" href="./css/regular.min.css">
+  <link rel="stylesheet" href="./css/svg-with-js.min.css">
+  <title>Category</title>
+</head>
+<!-- call initCategoryPage when page loads -->
+<body>
+  <div class="category-wrapper">
+    <div class="category">
+      <h2>Category</h2>
+
+      <div class="category-form">
+        <input type="text" id="category-name" placeholder="Enter category name" />
+        <!-- call addCategory() directly from HTML -->
+        <input type="file" id="logo-file" accept="image/*" />
+        <button id="add-category-btn" type="button" onclick=addCategory()>Add Category</button>
+      </div>
+
+      <div class="category-table-container">
+        <table class="category-table">
+          <thead>
+            <tr>
+              <th>S.No.</th>
+              <th>Category Name</th>
+              <th>Logo</th>
+              <th style="width: 50px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="category-table-body">
+            <!-- rows inserted by renderCategories() -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
