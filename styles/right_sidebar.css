@@ -61,8 +61,21 @@
   background: #f9f9f9;
 }
 
+.Right_side_bar .accordion li {
+  border: 0.1vw solid transparent;
+  border-radius: 0.6vw;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.Right_side_bar .accordion li:hover,
+.Right_side_bar .accordion li.active {
+  border-color: #000;
+}
+
 .Right_side_bar .accordion-header.active {
-  border: 0.05vw solid #000;
+  border: none;
+  border-bottom: 0.05vw solid #eee;
 }
 
 .Right_side_bar .accordion-header span {

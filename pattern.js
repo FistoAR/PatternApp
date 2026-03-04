@@ -8,125 +8,382 @@ const API_FETCH_PATTERNS =
 const API_DELETE_PATTERNS =
   "https://terratechpacks.com/App_3D/pattern_remove.php";
 
+let uploadTarget = { category: "", shape: "" };
+let allCategories = []; // Global storage for categories
+
 function initPatternPage() {
+  const globalFileInput = document.getElementById("global-pattern-file");
+  const shapeFilter = document.getElementById("shape-filter");
+  const categoryFilter = document.getElementById("category-filter");
+
   fetchPatternCategories();
   fetchPatterns();
 
-  const uploadBtn = document.getElementById("upload-btn");
-  if (uploadBtn) {
-    uploadBtn.addEventListener("click", uploadPatternHandler);
+  if (shapeFilter) {
+    shapeFilter.addEventListener("change", () => {
+      updateCategoryFilterOptions();
+      filterAndRenderGrid();
+    });
   }
 
-  const categorySelect = document.getElementById("category-select");
-  if (categorySelect) {
-    categorySelect.addEventListener("change", () => {
-      const selectedCategory = categorySelect.value;
-      fetchPatterns(selectedCategory);
+  if (categoryFilter) {
+    categoryFilter.addEventListener("change", () => {
+      filterAndRenderGrid();
     });
+  }
+
+  // Global View Detail Trigger
+  window.viewCategoryDetails = function (shape, category) {
+    if (shapeFilter && categoryFilter) {
+      shapeFilter.value = shape || "";
+      updateCategoryFilterOptions(); // Refresh category list based on shape
+      categoryFilter.value = category || "";
+      filterAndRenderGrid();
+    }
+  };
+
+  // Global Quick Upload Trigger
+  window.triggerQuickUpload = function (category, shape, el) {
+    uploadTarget = { category, shape, element: el };
+    if (globalFileInput) {
+      globalFileInput.value = ""; // Clear previous
+      globalFileInput.click();
+    }
+  };
+
+  // Handle file selection and immediate upload
+  if (globalFileInput) {
+    globalFileInput.onchange = async () => {
+      const file = globalFileInput.files[0];
+      if (!file) return;
+
+      const { category, shape, element } = uploadTarget;
+      if (!category || !shape) return;
+
+      let originalContent = "";
+      if (element) {
+        originalContent = element.innerHTML;
+        element.classList.add("loading");
+        element.innerHTML = '<span class="spinner solo"></span>';
+      }
+
+      const ext = file.name.split(".").pop().toLowerCase();
+      const allowed = ["jpg", "jpeg", "png", "gif", "webp"];
+      if (!allowed.includes(ext)) {
+        if (element) {
+          element.classList.remove("loading");
+          element.innerHTML = originalContent;
+        }
+        return alert("Invalid file type.");
+      }
+
+      const safeCategory = category.replace(/[^a-z0-9_-]/gi, "_");
+      const filename = `${safeCategory}_${Date.now()}.${ext}`;
+
+      // Show a temporary loading indicator if possible, or just proceed
+      console.log(`Uploading ${filename} to ${category}...`);
+
+      try {
+        const uploadRes = await uploadToAssets(file, filename);
+        if (!uploadRes || !uploadRes.success) {
+          throw new Error("Upload failed.");
+        }
+
+        const res = await fetch(API_UPLOAD_PATTERN, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category_name: category,
+            shape_type: shape,
+            pattern_url: filename,
+          }),
+        });
+        const result = await res.json();
+
+        if (result.status === "success") {
+          fetchPatterns(); // Refresh list
+          showAlert("Pattern uploaded successfully!");
+        } else {
+          showAlert("Error: " + (result.message || "Upload failed"), "error");
+          if (element) {
+            element.classList.remove("loading");
+            element.innerHTML = originalContent;
+          }
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        showAlert(err.message || "An error occurred during upload.", "error");
+        if (element) {
+          element.classList.remove("loading");
+          element.innerHTML = originalContent;
+        }
+      }
+    };
   }
 }
 
-async function fetchPatternCategories() {
-  const categorySelect = document.getElementById("category-select");
-  if (!categorySelect) return;
+let loadedPatterns = []; // Global storage for patterns
 
-  categorySelect.innerHTML = '<option value="">Loading categories...</option>';
+function updateCategoryFilterOptions() {
+  const shapeFilter = document.getElementById("shape-filter");
+  const categoryFilter = document.getElementById("category-filter");
+  if (!shapeFilter || !categoryFilter) return;
+
+  const selectedShape = shapeFilter.value;
+  categoryFilter.innerHTML = '<option value="">All Categories</option>';
+
+  const filteredCats = selectedShape
+    ? allCategories.filter((cat) => cat.shape_type === selectedShape)
+    : allCategories;
+
+  filteredCats.forEach((cat) => {
+    const option = document.createElement("option");
+    option.value = cat.category;
+    option.textContent = cat.category;
+    categoryFilter.appendChild(option);
+  });
+
+  // Enable/Disable category filter based on selection
+  if (selectedShape === "") {
+    categoryFilter.disabled = true;
+    categoryFilter.style.opacity = "0.6";
+    categoryFilter.style.cursor = "not-allowed";
+  } else {
+    categoryFilter.disabled = false;
+    categoryFilter.style.opacity = "1";
+    categoryFilter.style.cursor = "pointer";
+  }
+}
+
+function filterAndRenderGrid() {
+  const gridContainer = document.getElementById("pattern-grid-container");
+  if (!gridContainer) return;
+
+  // Always use the Grid View (Grouped by Category)
+  renderPatternGrid(loadedPatterns, gridContainer);
+}
+
+function renderPatternTable(patterns, container) {
+  container.innerHTML = "";
+  if (!patterns.length) {
+    container.innerHTML = `<div class="loading-state">No patterns found.</div>`;
+    return;
+  }
+
+  const tableWrapper = document.createElement("div");
+  tableWrapper.className = "table-responsive";
+
+  const table = document.createElement("table");
+  table.className = "pattern-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>S.No.</th>
+        <th>Shape Type</th>
+        <th>Category</th>
+        <th style="width: 20%;">Pattern</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector("tbody");
+  patterns.forEach((p, idx) => {
+    const fileName = p.pattern_url || "";
+    const imageUrl = `https://terratechpacks.com/App_3D/Patterns/${encodeURIComponent(fileName)}`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${escapeHtml(p.shape_type)}</td>
+      <td>${escapeHtml(p.category_name)}</td>
+      <td><img src="${imageUrl}" class="table-img" alt="Pattern" onerror="this.onerror=null;this.src='';"/></td>
+      <td><i class="fa-solid fa-trash table-trash" data-id="${p.id}"></i></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tableWrapper.appendChild(table);
+  container.appendChild(tableWrapper);
+
+  // Attach delete events
+  tableWrapper.querySelectorAll(".table-trash").forEach((btn) => {
+    btn.onclick = () => {
+      const id = btn.getAttribute("data-id");
+      if (confirm("Are you sure you want to delete this pattern?")) {
+        deletePattern(id);
+      }
+    };
+  });
+}
+
+async function fetchPatternCategories() {
+  const shapeFilter = document.getElementById("shape-filter");
+  const categoryFilter = document.getElementById("category-filter");
+  if (!shapeFilter || !categoryFilter) return;
 
   try {
     const res = await fetch(API_FETCH_CATEGORIES, { cache: "no-store" });
     const data = await res.json();
-    console.log("Fetch pattern category", data);
 
     if (data.status === "success" && Array.isArray(data.data)) {
-      updateCategoriesUI(data.data, categorySelect);
-    } else {
-      categorySelect.innerHTML =
-        '<option value="">No categories available</option>';
+      allCategories = data.data;
+
+      const uniqueShapes = [
+        ...new Set(allCategories.map((cat) => cat.shape_type).filter((s) => s)),
+      ];
+
+      // Header Shape Filter
+      shapeFilter.innerHTML = '<option value="">All Types</option>';
+      uniqueShapes.sort().forEach((shape) => {
+        const option = document.createElement("option");
+        option.value = shape;
+        option.textContent = shape;
+        shapeFilter.appendChild(option);
+      });
+
+      updateCategoryFilterOptions();
+      filterAndRenderGrid();
     }
   } catch (err) {
     console.error("Error fetching categories:", err);
-    categorySelect.innerHTML =
-      '<option value="">Error loading categories</option>';
   }
 }
 
-function updateCategoriesUI(categories, categorySelect) {
-  categorySelect.innerHTML = '<option value="">-- All Categories --</option>';
-  categories.forEach((cat) => {
-    const option = document.createElement("option");
-    option.value = cat.category;
-    option.textContent = cat.category;
-    categorySelect.appendChild(option);
-  });
-}
-
-async function fetchPatterns(categoryName = "") {
-  const tableBody = document.getElementById("pattern-table-body");
-  if (!tableBody) return;
-
-  tableBody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
+async function fetchPatterns() {
+  const gridContainer = document.getElementById("pattern-grid-container");
+  if (!gridContainer) return;
 
   try {
     const res = await fetch(API_FETCH_PATTERNS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category_name: categoryName }),
+      body: JSON.stringify({ category_name: "" }),
     });
 
     const data = await res.json();
-    console.log("Fetch patterns response:", data);
 
     if (data.status === "success" && Array.isArray(data.data)) {
-      renderPatternTable(data.data, tableBody);
+      loadedPatterns = data.data;
+      filterAndRenderGrid();
     } else {
-      tableBody.innerHTML = `<tr><td colspan="4">No patterns found.</td></tr>`;
+      gridContainer.innerHTML = `<div class="loading-state">No patterns found.</div>`;
     }
   } catch (err) {
     console.error("Error fetching patterns:", err);
-    tableBody.innerHTML = `<tr><td colspan="4">Error loading patterns.</td></tr>`;
+    gridContainer.innerHTML = `<div class="loading-state">Error loading patterns.</div>`;
   }
 }
 
-function renderPatternTable(patterns, tableBody) {
-  tableBody.innerHTML = "";
+function renderPatternGrid(patterns, gridContainer) {
+  gridContainer.innerHTML = "";
 
-  if (!patterns.length) {
-    tableBody.innerHTML = `<tr><td colspan="4">No patterns available.</td></tr>`;
+  const shapeFilter = document.getElementById("shape-filter");
+  const categoryFilter = document.getElementById("category-filter");
+  const selectedShape = shapeFilter ? shapeFilter.value : "";
+  const selectedCategory = categoryFilter ? categoryFilter.value : "";
+
+  // Get active categories based on filters
+  let activeCategories = allCategories.filter((cat) => {
+    if (selectedShape && cat.shape_type !== selectedShape) return false;
+    if (selectedCategory && cat.category !== selectedCategory) return false;
+    return true;
+  });
+
+  // Show all active categories based on selection (include empty categories for easy upload)
+  if (activeCategories.length === 0) {
+    gridContainer.innerHTML = `<div class="loading-state">No categories available. Use filters to upload to new categories.</div>`;
     return;
   }
 
-  patterns.forEach((pattern, index) => {
-    const row = document.createElement("tr");
+  const wrapper = document.createElement("div");
+  // If both filters are selected, show in Big View
+  const isBigView = selectedShape !== "" && selectedCategory !== "";
+  wrapper.className = isBigView
+    ? "category-sections-wrapper big-view"
+    : "category-sections-wrapper";
 
-    const fileName = pattern.pattern_url || "";
-    const imageUrl = `https://terratechpacks.com/App_3D/Patterns/${encodeURIComponent(
-      fileName
-    )}`;
+  activeCategories.forEach((cat) => {
+    // Robust matching: trim and case-insensitive
+    const catPatterns = patterns.filter((p) => {
+      const pName = (p.category_name || "").trim().toLowerCase();
+      const cName = (cat.category || "").trim().toLowerCase();
+      return pName === cName || pName.includes(cName) || cName.includes(pName);
+    });
+    const baseUrl = "https://terratechpacks.com/App_3D/";
+    const logoUrl = cat.logo_url
+      ? baseUrl + cat.logo_url
+      : "assets/Logo/logo-icon.png";
 
-    console.log("pattern",pattern.pattern_url);
+    const isBigView = selectedShape !== "" && selectedCategory !== "";
+    const displayLimit = 6;
+    const showPatterns = isBigView
+      ? catPatterns
+      : catPatterns.slice(0, displayLimit);
+    const hasMore = !isBigView && catPatterns.length > displayLimit;
 
-    const escapedCategory = escapeHtml(pattern.category_name || "");
+    const card = document.createElement("div");
+    card.className = "category-card";
 
-    row.innerHTML = `
-      <td>${index + 1}</td>
-      <td>${escapedCategory}</td>
-      <td><img src="${imageUrl}" class="patternimg" alt="Pattern" style="max-width: 100px;" onerror="this.onerror=null;this.src='';"/></td>
-      <td>
-        <i class="fa-solid fa-trash trash" data-id="${pattern.id}" 
-           style="cursor:pointer;color:red;"></i>
-      </td>
+    card.innerHTML = `
+      <div class="category-card-header">
+        <div class="header-main-info">
+          <img src="${logoUrl}" class="category-card-logo" alt="Logo" onerror="this.src='assets/Logo/logo-icon.png'">
+          <div class="category-card-info">
+            <h3>${escapeHtml(cat.category)}</h3>
+            <span>${escapeHtml(cat.shape_type)}</span>
+          </div>
+        </div>
+        ${!isBigView ? `<button class="category-show-btn" onclick="window.viewCategoryDetails('${cat.shape_type}', '${cat.category}')">Show</button>` : ""}
+      </div>
+      <div class="patterns-grid">
+        <!-- Add Pattern Card -->
+        <div class="add-pattern-card" onclick="window.triggerQuickUpload('${cat.category}', '${cat.shape_type}', this)">
+          <i class="fa-solid fa-upload"></i>
+          <p><span>Upload</span></p>
+        </div>
+        <!-- List patterns -->
+        ${showPatterns
+          .map((p) => {
+            const fileName = p.pattern_url || "";
+            const imageUrl = `https://terratechpacks.com/App_3D/Patterns/${encodeURIComponent(
+              fileName,
+            )}`;
+            return `
+            <div class="pattern-card">
+              <img src="${imageUrl}" alt="Pattern" onerror="this.onerror=null;this.src='';"/>
+              <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
+                <i class="fa-solid fa-times"></i>
+              </button>
+            </div>
+          `;
+          })
+          .join("")}
+        ${
+          hasMore
+            ? `
+          <div class="pattern-more-card" onclick="window.viewCategoryDetails('${cat.shape_type}', '${cat.category}')">
+            <span>${catPatterns.length - displayLimit}+</span>
+          </div>
+        `
+            : ""
+        }
+      </div>
     `;
-
-    tableBody.appendChild(row);
+    wrapper.appendChild(card);
   });
 
-  document.querySelectorAll(".trash").forEach((btn) => {
-    btn.addEventListener("click", () => {
+  gridContainer.appendChild(wrapper);
+
+  // Attach delete events
+  document.querySelectorAll(".remove-pattern-btn").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
       const id = btn.getAttribute("data-id");
-      if (confirm("Are you sure you want to delete this pattern?")) {
+      showConfirm("Are you sure you want to delete this pattern?", () => {
         deletePattern(id);
-      }
-    });
+      });
+    };
   });
 }
 
@@ -141,7 +398,6 @@ async function uploadToAssets(file, filename) {
       body: formData,
     });
     const json = await response.json();
-    console.log("Upload response:", json);
     return json;
   } catch (error) {
     console.error("Upload failed:", error);
@@ -151,65 +407,52 @@ async function uploadToAssets(file, filename) {
 
 async function uploadPatternHandler() {
   const categorySelect = document.getElementById("category-select");
+  const shapeTypeSelect = document.getElementById("shape-type");
   const fileInput = document.getElementById("pattern-file");
-  if (!categorySelect || !fileInput) return;
+  if (!categorySelect || !shapeTypeSelect || !fileInput) return;
 
   const categoryName = categorySelect.value.trim();
+  const shapeType = shapeTypeSelect.value;
   const file = fileInput.files[0];
 
-  if (!categoryName) {
-    alert("Please select a category.");
-    return;
-  }
-  if (!file) {
-    alert("Please select a pattern file.");
-    return;
-  }
+  if (!categoryName) return alert("Please select a category.");
+  if (!shapeType) return alert("Please select a shape type.");
+  if (!file) return alert("Please select a pattern file.");
 
   const ext = file.name.split(".").pop().toLowerCase();
   const allowed = ["jpg", "jpeg", "png", "gif", "webp"];
-  if (!allowed.includes(ext)) {
-    alert("Invalid file type. Allowed: " + allowed.join(", "));
-    return;
-  }
+  if (!allowed.includes(ext)) return alert("Invalid file type.");
 
   const safeCategory = categoryName.replace(/[^a-z0-9_-]/gi, "_");
   const filename = `${safeCategory}_${Date.now()}.${ext}`;
 
-  
-
   const uploadRes = await uploadToAssets(file, filename);
-  if (!uploadRes || !uploadRes.success) {
-    alert(
-      "Failed to upload file: " +
-        (uploadRes && uploadRes.message ? uploadRes.message : "Unknown error")
-    );
-    return;
-  }
-
-console.log(categoryName,filename)
+  if (!uploadRes || !uploadRes.success) return alert("Upload failed.");
 
   const res = await fetch(API_UPLOAD_PATTERN, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       category_name: categoryName,
+      shape_type: shapeType,
       pattern_url: filename,
     }),
   });
   const result = await res.json();
-  console.log("Pattern add response:", result);
 
   if (result.status === "success") {
     alert("Pattern uploaded successfully");
+    const modal = document.getElementById("pattern-modal");
+    if (modal) modal.style.display = "none";
+
     fileInput.value = "";
     categorySelect.value = "";
+    shapeTypeSelect.value = "";
+    const fileNameDisplay = document.getElementById("file-name-display");
+    if (fileNameDisplay) fileNameDisplay.textContent = "";
+
+    const shapeFilter = document.getElementById("shape-filter");
     fetchPatterns();
-    const previewImage = document.getElementById("preview-image");
-    if (previewImage) {
-      previewImage.src = "";
-      previewImage.style.display = "none";
-    }
   } else {
     alert("Error: " + (result.message || "Upload failed"));
   }
@@ -225,14 +468,16 @@ async function deletePattern(id) {
 
     const data = await res.json();
     if (data.status === "success") {
-      alert("Pattern deleted successfully.");
+      showAlert("Pattern deleted successfully.");
       fetchPatterns();
     } else {
-      alert("Error: " + (data.message || "Unable to delete pattern."));
+      showAlert(
+        "Error: " + (data.message || "Unable to delete pattern."),
+        "error",
+      );
     }
   } catch (err) {
     console.error("Delete error:", err);
-    alert("Unexpected error occurred.");
   }
 }
 
@@ -251,27 +496,84 @@ function escapeHtml(unsafe) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const fileInput = document.getElementById("pattern-file");
-  const previewImg = document.getElementById("preview-image");
+// Custom Alert Helper
+function showAlert(message, type = "success") {
+  let overlay = document.getElementById("custom-alert-overlay");
 
-  fileInput.addEventListener("change", function () {
-    const file = this.files[0];
-    if (!file) {
-      previewImg.style.display = "none";
-      previewImg.src = "";
-      return;
-    }
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "custom-alert-overlay";
+    overlay.className = "alert-overlay";
+    overlay.innerHTML = `
+      <div class="alert-box">
+        <div id="alert-icon" class="alert-icon"></div>
+        <div id="alert-message" class="alert-message"></div>
+        <button class="alert-btn" onclick="closeCustomAlert()">OK</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
 
-    if (previewImg.dataset.url) {
-      URL.revokeObjectURL(previewImg.dataset.url);
-    }
+  const iconEl = document.getElementById("alert-icon");
+  const msgEl = document.getElementById("alert-message");
 
-    const objectUrl = URL.createObjectURL(file);
-    previewImg.src = objectUrl;
-    previewImg.dataset.url = objectUrl;
-    previewImg.style.display = "block";
-  });
+  iconEl.className = "alert-icon " + type;
+  if (type === "success")
+    iconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+  else if (type === "error")
+    iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+  else iconEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
 
+  msgEl.innerText = message;
+  overlay.style.display = "flex";
+}
+
+// Custom Confirm Helper
+function showConfirm(message, onConfirm) {
+  let overlay = document.getElementById("custom-confirm-overlay");
+
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "custom-confirm-overlay";
+    overlay.className = "alert-overlay";
+    overlay.innerHTML = `
+      <div class="alert-box">
+        <div class="alert-icon error"><i class="fa-solid fa-circle-question"></i></div>
+        <div id="confirm-message" class="alert-message"></div>
+        <div style="display: flex; gap: 1vw; justify-content: center;">
+          <button class="alert-btn" id="confirm-yes-btn">Yes, Delete</button>
+          <button class="alert-btn" style="background-color: #eee; color: #333;" id="confirm-no-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  const msgEl = document.getElementById("confirm-message");
+  const yesBtn = document.getElementById("confirm-yes-btn");
+  const noBtn = document.getElementById("confirm-no-btn");
+
+  msgEl.innerText = message;
+  overlay.style.display = "flex";
+
+  yesBtn.onclick = () => {
+    overlay.style.display = "none";
+    onConfirm();
+  };
+
+  noBtn.onclick = () => {
+    overlay.style.display = "none";
+  };
+}
+
+window.closeCustomAlert = function () {
+  const overlay = document.getElementById("custom-alert-overlay");
+  if (overlay) overlay.style.display = "none";
+};
+
+// Initial call
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initPatternPage);
+} else {
   initPatternPage();
-});
+}

@@ -358,6 +358,8 @@ async function initModelAccordion() {
       // Close all other model accordion sections
       modelAccordion.querySelectorAll(".accordion-header").forEach((h) => {
         if (h !== header) {
+          const parentLi = h.closest("li");
+          if (parentLi) parentLi.classList.remove("active");
           h.classList.remove("active");
           const c = h.nextElementSibling;
           if (c) {
@@ -370,11 +372,13 @@ async function initModelAccordion() {
       });
 
       if (isOpen) {
+        li.classList.remove("active");
         header.classList.remove("active");
         content.style.maxHeight = "0px";
         content.classList.remove("active");
         header.querySelector(".drop").className = "fa-solid fa-angle-down drop";
       } else {
+        li.classList.add("active");
         header.classList.add("active");
         content.classList.add("active");
         content.style.maxHeight = content.scrollHeight + "px";
@@ -559,6 +563,8 @@ async function initCategoryAccordion() {
 
       accordion.querySelectorAll(".accordion-header").forEach((h) => {
         if (h !== header) {
+          const parentLi = h.closest("li");
+          if (parentLi) parentLi.classList.remove("active");
           h.classList.remove("active");
           const c = h.nextElementSibling;
           if (c) c.style.maxHeight = "0px";
@@ -568,10 +574,12 @@ async function initCategoryAccordion() {
       });
 
       if (isOpen) {
+        li.classList.remove("active");
         header.classList.remove("active");
         content.style.maxHeight = "0px";
         header.querySelector(".drop").className = "fa-solid fa-angle-down drop";
       } else {
+        li.classList.add("active");
         header.classList.add("active");
 
         if (!content.dataset.loaded) {

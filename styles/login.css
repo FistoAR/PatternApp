@@ -45,20 +45,128 @@
     }
 
     body {
-      /* background: linear-gradient(135deg, #4f46e5, #7c3aed); */
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 20px;
       color: var(--dark);
+      background: #f1f5f9; /* Subtle background color */
+    }
+
+    /* Custom Alert Modal Styles */
+    .alert-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .alert-modal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .alert-content {
+      background: white;
+      padding: 2.8vw;
+      border-radius: 1.6vw;
+      width: 90%;
+      max-width: 28vw;
+      text-align: center;
+      box-shadow: 0 1.4vw 2.8vw rgba(0, 0, 0, 0.2);
+      transform: scale(0.8);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .alert-modal.show .alert-content {
+      transform: scale(1);
+    }
+
+    .alert-icon {
+      font-size: 3.5vw;
+      color: var(--primary);
+      margin-bottom: 1.4vw;
+    }
+
+    .alert-content h3 {
+      font-size: 1.5vw;
+      margin-bottom: 0.8vw;
+      color: var(--dark);
+    }
+
+    .alert-content p {
+      color: #64748b;
+      margin-bottom: 2.1vw;
+      line-height: 1.5;
+      font-size: 1vw;
+    }
+
+    .alert-btn {
+      width: 100%;
+      padding: 1vw;
+      border: none;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      border-radius: 0.8vw;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 1vw;
+    }
+
+    .alert-btn:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+
+    .back-home {
+      position: fixed;
+      top: 2vw;
+      left: 2vw;
+      display: flex;
+      align-items: center;
+      gap: 0.7vw;
+      padding: 0.8vw 1.4vw;
+      background: white;
+      color: var(--dark);
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 0.8vw;
+      box-shadow: 0 0.3vw 1vw rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 1000;
+      border: 0.07vw solid var(--border);
+      font-size: 1vw;
+    }
+
+    .back-home:hover {
+      background: var(--primary);
+      color: white;
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(157, 168, 0, 0.3);
+      border-color: var(--primary);
+    }
+
+    .back-home i {
+      font-size: 1.1vw;
     }
 
     .auth-container {
-      width: 100%;
-      max-width: 900px;
-      min-height: 600px;
-      border-radius: 24px;
+      width: 90vw;
+      max-width: 65vw;
+      min-height: 40vw;
+      border-radius: 2vw;
       overflow: hidden;
       display: flex;
       position: relative;
@@ -68,7 +176,7 @@
 
     .form-panel {
       width: 50%;
-      padding: 50px 40px;
+      padding: 3.5vw 2.8vw;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -82,7 +190,7 @@
     .form {
       display: none;
       flex-direction: column;
-      gap: 24px;
+      gap: 1.5vw;
     }
 
     .form.active {
@@ -102,15 +210,16 @@
     }
 
     .form h2 {
-      font-size: 2.2rem;
+      font-size: 2.22vw;
       font-weight: 600;
       color: var(--dark);
-      margin-bottom: 8px;
+      margin-bottom: 0.5vw;
     }
 
     .form p {
       color: #64748b;
-      margin-bottom: 24px;
+      margin-bottom: 1.6vw;
+      font-size: 1vw;
     }
 
     .input-group {
@@ -120,17 +229,17 @@
     }
 
     .input-group label {
-      margin-bottom: 8px;
-      font-size: 0.95rem;
+      margin-bottom: 0.5vw;
+      font-size: 0.9vw;
       font-weight: 500;
       color: var(--dark);
     }
 
     .input-group input {
-      padding: 14px 16px;
-      border: 2px solid var(--border);
-      border-radius: 14px;
-      font-size: 1rem;
+      padding: 0.9vw 1.1vw;
+      border: 0.14vw solid var(--border);
+      border-radius: 0.9vw;
+      font-size: 1vw;
       transition: all 0.3s ease;
       background: white;
     }
@@ -143,37 +252,81 @@
 
     .input-group i {
       position: absolute;
-      right: 16px;
-      top: 42px;
+      right: 1.1vw;
+      top: 3.5vw;
       color: #94a3b8;
+      transform: translateY(-50%);
+      font-size: 1.1vw;
     }
 
     .error-message {
-      font-size: 0.85rem;
+      font-size: 0.75vw;
       color: var(--error);
-      margin-top: 6px;
+      margin-top: 0.3vw;
       display: none;
       font-weight: 500;
+      text-transform: none;
+      line-height: normal;
     }
 
     .options {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.95rem;
+      font-size: 0.9vw;
+      gap: 0.5vw;
     }
 
-    .options label {
+    .options .error-message {
+      flex-basis: 100%;
+      order: 3;
+    }
+
+    .custom-check.error .checkmark {
+      border-color: var(--error);
+      box-shadow: 0 0 0 0.2vw rgba(239, 68, 68, 0.2);
+    }
+
+    .custom-check {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 0.6vw;
       cursor: pointer;
+      position: relative;
     }
 
-    .options input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--primary);
+    .custom-check input {
+      display: none;
+    }
+
+    .checkmark {
+      width: 1.25vw;
+      height: 1.25vw;
+      border: 0.14vw solid var(--border);
+      border-radius: 0.4vw;
+      background: white;
+      transition: all 0.3s ease;
+      display: inline-block;
+      position: relative;
+    }
+
+    .custom-check input:checked ~ .checkmark {
+      background: var(--primary);
+      border-color: var(--primary);
+      box-shadow: 0 0.3vw 0.8vw rgba(157, 168, 0, 0.3);
+    }
+
+    .custom-check input:checked ~ .checkmark::after {
+      content: '\f00c';
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.75vw;
+      color: white;
     }
 
     .options a {
@@ -189,16 +342,16 @@
     }
 
     .auth-btn {
-      padding: 14px;
+      padding: 1vw;
       border: none;
       background: linear-gradient(to right, var(--primary), var(--primary-dark));
       color: white;
-      font-size: 1.1rem;
+      font-size: 1.1vw;
       font-weight: 600;
-      border-radius: 14px;
+      border-radius: 1vw;
       cursor: pointer;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 0.3vw 0.4vw -0.1vw rgba(99, 102, 241, 0.3);
     }
 
     .auth-btn:hover {
@@ -213,9 +366,9 @@
     .terms {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.95rem;
-      margin-top: 8px;
+      gap: 0.6vw;
+      font-size: 0.9vw;
+      margin-top: 0.6vw;
     }
 
     .terms a {
@@ -241,7 +394,7 @@
 
     .toggle-content {
       text-align: center;
-      padding: 40px;
+      padding: 2.8vw;
       max-width: 80%;
     }
 
@@ -280,25 +433,25 @@
     }
 
     .toggle-content h3 {
-      font-size: 1.8rem;
+      font-size: 1.8vw;
       font-weight: 600;
-      margin-bottom: 16px;
+      margin-bottom: 1.1vw;
     }
 
     .toggle-content p {
-      font-size: 1.1rem;
-      margin-bottom: 30px;
+      font-size: 1.1vw;
+      margin-bottom: 2.1vw;
       line-height: 1.6;
     }
 
     .ghost-btn {
-      padding: 14px 32px;
+      padding: 1vw 2.2vw;
       background: transparent;
-      border: 2px solid white;
+      border: 0.14vw solid white;
       color: white;
-      font-size: 1.1rem;
+      font-size: 1.1vw;
       font-weight: 600;
-      border-radius: 14px;
+      border-radius: 1vw;
       cursor: pointer;
       transition: all 0.3s ease;
     }

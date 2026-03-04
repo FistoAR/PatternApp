@@ -11,56 +11,32 @@
     <link rel="stylesheet" href="./css/svg-with-js.min.css">
   </head>
   <body>
-    <div class="container">
-      <h1>Pattern Upload</h1>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="category-select">Select Category</label>
-          <select id="category-select">
-            <option value="">-- Select Category --</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="pattern-file">Select Pattern Image</label>
-          <input type="file" id="pattern-file" accept="image/*" />
+    <div class="pattern-wrapper">
+      <div class="pattern-header">
+        <h2>Pattern List</h2>
+        <div class="header-controls">
+          <div class="control-group">
+            <label>Select Type</label>
+            <select id="shape-filter" class="filter-select">
+              <option value="">All Types</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label>Select Category</label>
+            <select id="category-filter" class="filter-select">
+              <option value="">All Categories</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <img
-        id="preview-image"
-        src=""
-        alt="Preview"
-        style="
-          display: none;
-          margin-bottom: 15px;
-          max-width: 200px;
-          max-height: 150px;
-        "
-      />
+      <!-- Global Hidden Upload Input -->
+      <input type="file" id="global-pattern-file" accept="image/*" style="display: none;" />
 
-      <button id="upload-btn" type="button">Upload Pattern</button>
-
-      <div class="message" id="message"></div>
-
-      <h3 style="margin-bottom: 10px;">Uploaded Patterns</h3>
-      <div class="table-container">
-        <table class="pattern-table">
-          <thead>
-            <tr>
-              <th>S.No.</th>
-              <th>Category</th>
-              <th>Pattern</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="pattern-table-body">
-            <tr>
-              <td colspan="4">Loading...</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Patterns Grid View -->
+      <div id="pattern-grid-container" class="pattern-grid-container">
+        <!-- Category sections will be rendered here -->
+        <div class="loading-state">Loading patterns...</div>
       </div>
     </div>
   </body>
