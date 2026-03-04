@@ -3,62 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Auth Page</title>
-  <link rel="stylesheet" href="./styles/login.css?v=2">
+  <title>Modern Auth Page</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles/login.css">
 </head>
 <body>
   <div class="auth-container" id="auth-container">
     <!-- FORM PANEL -->
     <div class="form-panel">
+      <!-- <div class="logo">
+        <i class="fas fa-lock"></i>
+        <h1>SecureAuth</h1>
+      </div> -->
+      
       <!-- Sign In Form -->
-      <form class="form sign-in-form" id="sign-in-form">
+      <form class="form sign-in-form active" id="sign-in-form">
         <h2>Welcome Back</h2>
+        <p>Sign in to access your account</p>
+        
         <div class="input-group">
-          <label for="signin-name">User Name</label>
-          <input type="text" id="signin-name" placeholder="Enter Your User Name" required />
+          <label for="signin-name">Username</label>
+          <input type="text" id="signin-name" placeholder="Enter your username" required />
+          <i class="fas fa-user"></i>
           <small class="error-message"></small>
         </div>
+        
         <div class="input-group">
           <label for="signin-password">Password</label>
-          <input type="password" id="signin-password" placeholder="Enter Your Password" required />
+          <input type="password" id="signin-password" placeholder="Enter your password" required />
+          <i class="fas fa-lock"></i>
           <small class="error-message"></small>
         </div>
+        
         <div class="options">
-          <label><input type="checkbox" id="signin-check" /> Remember Me</label>
+          <label>
+            <input type="checkbox" id="signin-check" />
+            Remember me
+          </label>
           <a href="#">Forgot Password?</a>
         </div>
+        
         <button type="submit" class="auth-btn">Sign In</button>
       </form>
 
       <!-- Sign Up Form -->
       <form class="form sign-up-form" id="sign-up-form">
         <h2>Create Account</h2>
+        <p>Join us today to get started</p>
+        
         <div class="input-group">
-          <label for="signup-name">User Name</label>
-          <input type="text" id="signup-name" placeholder="Enter Your User Name" required />
+          <label for="signup-name">Username</label>
+          <input type="text" id="signup-name" placeholder="Choose a username" required />
+          <i class="fas fa-user"></i>
           <small class="error-message"></small>
         </div>
-        <!-- <div class="input-group">
-          <label for="signup-email">Email</label>
-          <input type="email" id="signup-email" placeholder="Enter Your Email" required />
-          <small class="error-message"></small>
-        </div> -->
+        
         <div class="input-group">
           <label for="signup-password">Password</label>
-          <input type="password" id="signup-password" placeholder="Enter Your Password" required />
+          <input type="password" id="signup-password" placeholder="Create a password" required />
+          <i class="fas fa-lock"></i>
           <small class="error-message"></small>
         </div>
+        
         <div class="input-group">
           <label for="signup-confirm-password">Confirm Password</label>
-          <input type="password" id="signup-confirm-password" placeholder="Enter Your Confirm Password" required />
+          <input type="password" id="signup-confirm-password" placeholder="Confirm your password" required />
+          <i class="fas fa-lock"></i>
           <small class="error-message"></small>
         </div>
-        <div style="display: flex;">
-          <label class="terms">
-          <input type="checkbox" id="signup-check" required />
-          I agree to the 
-        </label>&nbsp; <a href="#"><small>Terms & Conditions</small></a>
+        
+        <div class="terms">
+          <label>
+            <input type="checkbox" id="signup-check" required />
+            I agree to the 
+          </label>
+          <a href="#">Terms & Conditions</a>
         </div>
+        
         <button type="submit" class="auth-btn">Sign Up</button>
       </form>
     </div>
@@ -68,17 +89,216 @@
       <div class="toggle-content">
         <div class="toggle-left">
           <h3>Don't have an account?</h3>
-          <p>Sign up to get started!</p>
-          <button id="switch-to-signup" class="ghost-btn" style="border-radius: 25px;">Sign Up</button>
+          <p>Sign up to unlock all features and get started with our platform today!</p>
+          <button id="switch-to-signup" class="ghost-btn">Sign Up</button>
         </div>
         <div class="toggle-right">
           <h3>Already have an account?</h3>
-          <p>Sign in to continue!</p>
-          <button id="switch-to-signin" class="ghost-btn" style="border-radius: 25px;">Sign In</button>
+          <p>Sign in to continue your journey with us and access your dashboard.</p>
+          <button id="switch-to-signin" class="ghost-btn">Sign In</button>
         </div>
       </div>
     </div>
   </div>
-<script src="./login.js?v=2"></script>
+
+  <!-- <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const authContainer = document.getElementById('auth-container');
+      const switchToSignupBtn = document.getElementById('switch-to-signup');
+      const switchToSigninBtn = document.getElementById('switch-to-signin');
+
+      const signInForm = document.getElementById('sign-in-form');
+      const signUpForm = document.getElementById('sign-up-form');
+
+      function showSignIn() {
+      authContainer.classList.remove('active');
+      signInForm.classList.add('active');
+      signUpForm.classList.remove('active');
+      clearFormErrors(signInForm);
+      clearFormErrors(signUpForm);
+      localStorage.setItem('authActiveTab', 'signin');
+    }
+
+    function showSignUp() {
+      authContainer.classList.add('active');
+      signUpForm.classList.add('active');
+      signInForm.classList.remove('active');
+      clearFormErrors(signInForm);
+      clearFormErrors(signUpForm);
+      localStorage.setItem('authActiveTab', 'signup');
+    }
+
+      // Event Listeners to switch tabs
+      switchToSignupBtn.addEventListener('click', showSignUp);
+      switchToSigninBtn.addEventListener('click', showSignIn);
+
+      // On page load, check saved state and set form
+      // On page load
+const savedTab = localStorage.getItem('authActiveTab');
+if (savedTab === 'signup') {
+  showSignUp();
+} else {
+  showSignIn();
+}
+
+      function clearFormErrors(form) {
+        const errorMessages = form.querySelectorAll('.error-message');
+        errorMessages.forEach(em => {
+          em.textContent = '';
+          em.style.display = 'none';
+        });
+      }
+
+      function validateEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(email.toLowerCase());
+      }
+
+      function validatePassword(password) {
+        return password.length >= 8;
+      }
+
+      function attachRealtimeValidation(form) {
+        form.querySelectorAll('input').forEach(input => {
+          input.addEventListener('input', () => {
+            validateField(input, form);
+          });
+        });
+      }
+
+      function validateField(input, form) {
+        const errorEl = input.nextElementSibling.nextElementSibling;
+        const val = input.value.trim();
+
+        if (input.type === 'email' && !validateEmail(val)) {
+          errorEl.textContent = 'Please enter a valid email address.';
+          errorEl.style.display = 'block';
+          return false;
+        }
+
+        if (input.type === 'password' && !validatePassword(val)) {
+          errorEl.textContent = 'Password must be at least 8 characters.';
+          errorEl.style.display = 'block';
+          return false;
+        }
+
+        if (input.id === 'signup-confirm-password') {
+          const pwd = form.querySelector('#signup-password').value;
+          if (val !== pwd) {
+            errorEl.textContent = 'Passwords do not match.';
+            errorEl.style.display = 'block';
+            return false;
+          }
+        }
+
+        if (input.hasAttribute('required') && val === '') {
+          errorEl.textContent = 'This field is required.';
+          errorEl.style.display = 'block';
+          return false;
+        }
+
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+        return true;
+      }
+
+      signInForm.addEventListener('submit', e => {
+        e.preventDefault();
+        clearFormErrors(signInForm);
+
+        let valid = true;
+
+        const usernameInput = signInForm.querySelector('#signin-name');
+        const passInput = signInForm.querySelector('#signin-password');
+        const rememberCheckbox = signInForm.querySelector('#signin-check');
+
+        if (usernameInput.value.trim() === '') {
+          showError(usernameInput, 'Please enter your username.');
+          valid = false;
+        }
+
+        if (!validatePassword(passInput.value.trim())) {
+          showError(passInput, 'Password must be at least 8 characters.');
+          valid = false;
+        }
+
+        if (!rememberCheckbox.checked) {
+          alert('You must check the remember box.');
+          valid = false;
+        }
+
+        if (valid) {
+          const data = {
+            username: usernameInput.value.trim(),
+            password: passInput.value.trim(),
+            remember: rememberCheckbox.checked
+          };
+
+          // Simulate API call
+          setTimeout(() => {
+            alert('Sign In Successful!');
+            signInForm.reset();
+            // window.location.href = 'admin.html';
+          }, 800);
+        }
+      });
+
+      signUpForm.addEventListener('submit', e => {
+        e.preventDefault();
+        clearFormErrors(signUpForm);
+
+        let valid = true;
+
+        const nameInput = signUpForm.querySelector('#signup-name');
+        const passInput = signUpForm.querySelector('#signup-password');
+        const confirmPassInput = signUpForm.querySelector('#signup-confirm-password');
+        const termsCheckbox = signUpForm.querySelector('#signup-check');
+
+        if (nameInput.value.trim() === '') {
+          showError(nameInput, 'Please enter your username.');
+          valid = false;
+        }
+
+        if (!validatePassword(passInput.value.trim())) {
+          showError(passInput, 'Password must be at least 8 characters.');
+          valid = false;
+        }
+
+        if (confirmPassInput.value.trim() !== passInput.value.trim()) {
+          showError(confirmPassInput, 'Passwords do not match.');
+          valid = false;
+        }
+
+        if (!termsCheckbox.checked) {
+          alert('You must agree to the Terms & Conditions.');
+          valid = false;
+        }
+
+        if (valid) {
+          const data = {
+            username: nameInput.value.trim(),
+            password: passInput.value.trim(),
+            agreedToTerms: termsCheckbox.checked
+          };
+
+          // Simulate API call
+          setTimeout(() => {
+            alert('Sign Up Successful!');
+            signUpForm.reset();
+          }, 800);
+        }
+      });
+
+      function showError(input, message) {
+        const errorEl = input.nextElementSibling.nextElementSibling;
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+
+      attachRealtimeValidation(signInForm);
+      attachRealtimeValidation(signUpForm);
+    });
+  </script> -->
+  <script src="login.js"></script>
 </body>
 </html>
