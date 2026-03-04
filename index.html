@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./css/solid.min.css">
     <link rel="stylesheet" href="./css/regular.min.css">
     <link rel="stylesheet" href="./css/svg-with-js.min.css">
-    <link rel="stylesheet" href="index.css?v=2" />
+    <link rel="stylesheet" href="index.css" />
     <link rel="stylesheet" href="./styles/nav.css" />
     <link rel="stylesheet" href="./styles/left_sidebar.css" />
     <link rel="stylesheet" href="./styles/right_sidebar.css" />
@@ -43,7 +43,7 @@
           <p>Select Pattern</p>
           <div class="pattern_box">
             <div class="pattern_list">
-              <ul class="accordion">
+              <ul class="accordion" id="patternAccordion">
                 <!-- category is injucted from js -->
               </ul>
             </div>
@@ -119,9 +119,18 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                position: relative;
+                padding: 0 1vw;
               "
             >
               <h3 id="mainModelTitle">120ml Round Container</h3>
+              <div style="position: absolute; right: 1vw; display: flex; align-items: center; gap: 0.5vw;">
+                <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Rotate</span>
+                <label class="rotate-switch">
+                  <input type="checkbox" id="autoRotateToggle" checked>
+                  <span class="rotate-slider"></span>
+                </label>
+              </div>
             </div>
             <div class="model_view">
               <model-viewer
@@ -130,6 +139,7 @@
                 alt="120ml Round Container"
                 camera-controls
                 auto-rotate
+                auto-rotate-delay="0"
                 exposure="1"
                 rotation-per-second="60deg"
                 shadow-intensity="0.5"
@@ -143,30 +153,38 @@
           </div>
 
           <div class="model_file">
-            <div class="parts">
-              <select id="partSelect">
+            <!-- Part Selection & Colors -->
+            <div class="footer-section part-controls">
+              <select id="partSelect" class="styled-select">
                 <option selected value="lid">Lid</option>
                 <option value="tub">Tub</option>
               </select>
-
               <div id="colorOptions" class="color-options">
-                <!-- Dynamic radio buttons will be inserted here -->
+                <!-- Dynamic radio buttons -->
+              </div>
+              <div id="partColorPickerTrigger" class="custom-color-picker">
+                <img src="./assets/pngwing.png" alt="Custom Part Color" title="Choose Custom Color" />
+                <div id="partColorPicker" style="display:none;"></div>
               </div>
             </div>
-            <div class="colour_picker">
+
+            <!-- Background Setup -->
+            <div class="footer-section bg-controls">
               <label>Background:</label>
-              <div id="bgColorPickerTrigger">
-                <img src="./assets/pngwing.png" alt="wheel" style="width: 35px; height: 35px; cursor: pointer;" />
-                <!-- Hidden element for Pickr -->
-              </div><div id="bgColorPicker" style="display: none;"></div>
+              <div id="bgColorPickerTrigger" class="custom-color-picker">
+                <img src="./assets/pngwing.png" alt="Background Color" title="Change Environment Background" />
+                <div id="bgColorPicker" style="display: none;"></div>
+              </div>
             </div>
-            <div class="export">
-              <select id="exportFormat">
+
+            <!-- Export Options -->
+            <div class="footer-section export-controls">
+              <select id="exportFormat" class="styled-select">
                 <option value="png">PNG</option>
                 <option value="jpg">JPG</option>
                 <option value="pdf">PDF</option>
               </select>
-              <button id="exportBtn">Export</button>
+              <button id="exportBtn" class="primary-btn">Export</button>
             </div>
           </div>
         </div>
@@ -174,9 +192,9 @@
           <p>Select Model</p>
           <!-- thumbnails -->
           <div class="thumbs">
-            <div class="thumb-grid" id="thumbGrid">
-              <!-- thumbnails injected by JS -->
-            </div>
+            <ul class="accordion" id="modelAccordion">
+              <!-- models injected by JS -->
+            </ul>
           </div>
         </div>
       </div>
@@ -186,6 +204,6 @@
       </div>
     </div>
     <script src="./js/jspdf.umd.min.js"></script>
-    <script src="model.js?v=2"></script>
+    <script src="model.js"></script>
   </body>
 </html>

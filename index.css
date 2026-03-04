@@ -41,14 +41,14 @@
   display: grid;
   /* background-color:aqua; */
   grid-template-rows: repeat(5, 1fr);
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: 20vw 1fr 15vw;
 }
 
 .left_side_bar {
   grid-column: 1/ 2;
   grid-row: 1/ 6;
-  border-right: 2px solid black;
-  padding: 20px 0;
+  border-right: 0.15vw solid black;
+  padding: 1.2vw 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -67,8 +67,8 @@
 .Right_side_bar {
   grid-column: 5/6;
   grid-row: 1/6;
-  border-left: 2px solid black;
-  padding: 20px 0;
+  border-left: 0.15vw solid black;
+  padding: 1.2vw 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -89,9 +89,9 @@
 }
 
 .spinner {
-  width: 50px;
-  height: 50px;
-  border: 6px solid #ddd;
+  width: 3vw;
+  height: 3vw;
+  border: 0.4vw solid #ddd;
   border-top-color: #fbd238;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -105,7 +105,7 @@
 
 
 .pattern-loader {
-  padding: 10px;
+  padding: 0.6vw;
   text-align: center;
   font-style: italic;
   color: #666;
@@ -113,8 +113,8 @@
 .pattern-swatch.error {
   background-color: #eee;
   color: #c00;
-  padding: 10px;
-  font-size: 12px;
+  padding: 0.6vw;
+  font-size: 0.75vw;
   text-align: center;
 }
 

@@ -1,5 +1,47 @@
 // ---------- PERFORMANCE HELPERS ----------
 const viewerTextureCache = new WeakMap(); // per-viewer texture cache
+let rotateSpeedAnim;
+
+function updateAutoRotateSmooth(enabled, instantaneous = false) {
+  if (!mainViewer) return;
+  cancelAnimationFrame(rotateSpeedAnim);
+
+  const targetSpeed = enabled ? 60 : 0;
+  // Get current speed from attribute or default
+  const startSpeed =
+    parseFloat(mainViewer.getAttribute("rotation-per-second")) || 0;
+
+  if (instantaneous) {
+    mainViewer.autoRotate = enabled;
+    mainViewer.setAttribute("rotation-per-second", `${targetSpeed}deg`);
+    return;
+  }
+
+  // If enabling, turn on the property immediately
+  if (enabled) mainViewer.autoRotate = true;
+
+  const startTime = performance.now();
+  const duration = 800; // Smoother 0.8s transition
+
+  function animate(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Smooth deceleration/acceleration (easeInOutSine)
+    const eased = -(Math.cos(Math.PI * progress) - 1) / 2;
+
+    const currentSpeed = startSpeed + (targetSpeed - startSpeed) * eased;
+    mainViewer.setAttribute("rotation-per-second", `${currentSpeed}deg`);
+
+    if (progress < 1) {
+      rotateSpeedAnim = requestAnimationFrame(animate);
+    } else {
+      // If we finished turning it off, disable the property to save energy
+      if (!enabled) mainViewer.autoRotate = false;
+    }
+  }
+  rotateSpeedAnim = requestAnimationFrame(animate);
+}
 
 function stripQuery(u) {
   try {
@@ -34,7 +76,7 @@ const PART_MATERIALS = {
 /********** UPDATE MATERIAL COLOR **********/
 function updateMaterialColor(part, color, { skipWait = false } = {}) {
   const viewers = Array.from(
-    new Set([...(state.modelViewers || []), mainViewer].filter(Boolean))
+    new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
   );
 
   const factors = {
@@ -43,7 +85,21 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
     transparency: [1, 1, 1, 0.3],
   };
 
-  const factor = factors[color.toLowerCase()];
+  let factor = factors[color.toLowerCase()];
+
+  if (!factor && color.startsWith("#")) {
+    const r = parseInt(color.slice(1, 3), 16) / 255;
+    const g = parseInt(color.slice(3, 5), 16) / 255;
+    const b = parseInt(color.slice(5, 7), 16) / 255;
+    const a = color.length > 7 ? parseInt(color.slice(7, 9), 16) / 255 : 1;
+    factor = [r, g, b, a];
+  } else if (!factor && color.startsWith("rgba")) {
+    const m = color.match(/[\d.]+/g);
+    if (m) {
+      factor = [m[0] / 255, m[1] / 255, m[2] / 255, parseFloat(m[3])];
+    }
+  }
+
   if (!factor) return;
 
   viewers.forEach((viewer) => {
@@ -53,7 +109,6 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
         const mat = viewer.model?.materials.find((m) => m.name === name);
         if (!mat) return;
 
-        // Remove texture if exists
         if (mat.pbrMetallicRoughness.baseColorTexture) {
           mat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
         }
@@ -71,7 +126,6 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
     }
   });
 
-  // Save immediately
   state.selectedColors[part] = color.toLowerCase();
   localStorage.setItem("selectedColors", JSON.stringify(state.selectedColors));
 }
@@ -96,8 +150,8 @@ function renderOptions(part) {
       state.selectedColors[part] = input.value;
       localStorage.setItem(
         "selectedColors",
-        JSON.stringify(state.selectedColors)
-      ); // ✅ save
+        JSON.stringify(state.selectedColors),
+      );
       updateMaterialColor(part, input.value);
     });
 
@@ -215,7 +269,7 @@ const state = {
 };
 
 /********** ELEMENTS **********/
-const thumbGrid = document.getElementById("thumbGrid");
+const modelAccordion = document.getElementById("modelAccordion");
 const mainViewer = document.getElementById("mainViewer");
 const mainModelTitle = document.getElementById("mainModelTitle");
 const logoInput = document.getElementById("logoUpload");
@@ -236,21 +290,31 @@ function delay(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-/********** THUMBNAILS **********/
-function initThumbnails() {
-  if (!thumbGrid) return;
-  thumbGrid.innerHTML = "";
+/********** MODEL ACCORDION **********/
+async function initModelAccordion() {
+  if (!modelAccordion) return;
+  modelAccordion.innerHTML = "";
+  state.thumbnails = [];
+  state.modelViewers = [];
   let modelIndex = 0;
 
-  Object.entries(MODEL_CATEGORIES).forEach(([category, models]) => {
-    const categoryDiv = document.createElement("div");
-    categoryDiv.className = "category-section";
-    const categoryTitle = document.createElement("h4");
-    categoryTitle.textContent = category;
-    categoryDiv.appendChild(categoryTitle);
+  const categories = { ...MODEL_CATEGORIES, ...Rectangle_MODEL_CATEGORIES };
 
-    const categoryGrid = document.createElement("div");
-    categoryGrid.className = "category-grid";
+  Object.entries(categories).forEach(([category, models]) => {
+    const li = document.createElement("li");
+
+    const header = document.createElement("div");
+    header.className = "accordion-header";
+    header.innerHTML = `
+      <span>${category}</span>
+      <i class="fa-solid fa-angle-down drop"></i>
+    `;
+
+    const content = document.createElement("div");
+    content.className = "accordion-content model-grid";
+    content.style.maxHeight = "0px";
+    content.style.overflow = "hidden";
+    content.style.transition = "max-height 0.3s ease";
 
     models.forEach((model) => {
       const card = document.createElement("div");
@@ -272,78 +336,62 @@ function initThumbnails() {
 
       card.appendChild(mv);
       card.appendChild(label);
-      categoryGrid.appendChild(card);
+      content.appendChild(card);
 
       state.thumbnails.push({ card, name: model.name, path: model.path });
       state.modelViewers.push(mv);
 
-      card.addEventListener("click", () =>
-        selectModel(Number(card.dataset.index))
-      );
+      card.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectModel(Number(card.dataset.index));
+      });
       modelIndex++;
     });
 
-    categoryDiv.appendChild(categoryGrid);
-    thumbGrid.appendChild(categoryDiv);
+    li.appendChild(header);
+    li.appendChild(content);
+    modelAccordion.appendChild(li);
+
+    header.addEventListener("click", () => {
+      const isOpen = header.classList.contains("active");
+
+      // Close all other model accordion sections
+      modelAccordion.querySelectorAll(".accordion-header").forEach((h) => {
+        if (h !== header) {
+          h.classList.remove("active");
+          const c = h.nextElementSibling;
+          if (c) {
+            c.style.maxHeight = "0px";
+            c.classList.remove("active");
+          }
+          const drop = h.querySelector(".drop");
+          if (drop) drop.className = "fa-solid fa-angle-down drop";
+        }
+      });
+
+      if (isOpen) {
+        header.classList.remove("active");
+        content.style.maxHeight = "0px";
+        content.classList.remove("active");
+        header.querySelector(".drop").className = "fa-solid fa-angle-down drop";
+      } else {
+        header.classList.add("active");
+        content.classList.add("active");
+        content.style.maxHeight = content.scrollHeight + "px";
+        header.querySelector(".drop").className = "fa-solid fa-angle-up drop";
+      }
+    });
   });
 
   markSelectedThumbnail(0);
-}
-
-/********** INIT RECTANGLE THUMBNAILS **********/
-function initRectangleThumbnails() {
-  if (!thumbGrid) return;
-  let modelIndex = state.thumbnails.length; // Continue from round models
-
-  Object.entries(Rectangle_MODEL_CATEGORIES).forEach(([category, models]) => {
-    const categoryDiv = document.createElement("div");
-    categoryDiv.className = "category-section";
-    const categoryTitle = document.createElement("h4");
-    categoryTitle.textContent = category;
-    categoryDiv.appendChild(categoryTitle);
-
-    const categoryGrid = document.createElement("div");
-    categoryGrid.className = "category-grid";
-
-    models.forEach((model) => {
-      const card = document.createElement("div");
-      card.className = "thumb-card";
-      card.dataset.index = modelIndex;
-
-      const mv = document.createElement("model-viewer");
-      mv.src = model.path;
-      mv.alt = model.name;
-      mv.disableZoom = true;
-      mv.cameraControls = true;
-      mv.reveal = "auto";
-      mv.interactionPrompt = "none";
-      mv.style.pointerEvents = "none";
-
-      const label = document.createElement("div");
-      label.className = "thumb-label";
-      label.textContent = model.name;
-
-      card.appendChild(mv);
-      card.appendChild(label);
-      categoryGrid.appendChild(card);
-
-      state.thumbnails.push({ card, name: model.name, path: model.path });
-      state.modelViewers.push(mv);
-
-      card.addEventListener("click", () =>
-        selectModel(Number(card.dataset.index))
-      );
-      modelIndex++;
-    });
-
-    categoryDiv.appendChild(categoryGrid);
-    thumbGrid.appendChild(categoryDiv);
-  });
+  // Open first category by default
+  const firstHeader = modelAccordion.querySelector(".accordion-header");
+  if (firstHeader) firstHeader.click();
 }
 
 function markSelectedThumbnail(index) {
   state.thumbnails.forEach((t, i) =>
-    t.card.classList.toggle("selected", i === index)
+    t.card.classList.toggle("selected", i === index),
   );
 }
 
@@ -368,6 +416,12 @@ async function selectModel(index) {
           await new Promise((r) => requestAnimationFrame(r));
         }
 
+        // Apply current auto-rotate state smoothly
+        const autoRotateToggle = document.getElementById("autoRotateToggle");
+        if (autoRotateToggle) {
+          updateAutoRotateSmooth(autoRotateToggle.checked, true);
+        }
+
         console.log("Model fully available:", selectedModel.name);
         console.log("logoDataUrl exists?", state.logoDataUrl ? true : false);
 
@@ -390,7 +444,7 @@ async function selectModel(index) {
           const viewers = [mainViewer];
           console.log(
             "Available materials on mainViewer:",
-            mainViewer.model?.materials?.map((m) => m.name)
+            mainViewer.model?.materials?.map((m) => m.name),
           );
 
           await Promise.all(
@@ -399,9 +453,9 @@ async function selectModel(index) {
                 v,
                 LOGO_MATERIAL_NAME,
                 state.logoDataUrl,
-                { forceReload: true }
-              )
-            )
+                { forceReload: true },
+              ),
+            ),
           );
         }
 
@@ -412,16 +466,15 @@ async function selectModel(index) {
         console.error("Error applying pattern or logo on model load:", err);
       }
     },
-    { once: true }
+    { once: true },
   );
 }
-
 
 /********** FETCH CATEGORIES & PATTERNS **********/
 async function fetchCategories() {
   try {
     const res = await fetch(
-      "https://terratechpacks.com/App_3D/category_fetch.php"
+      "https://terratechpacks.com/App_3D/category_fetch.php",
     );
     const json = await res.json();
     return json.status === "success" && Array.isArray(json.data)
@@ -442,20 +495,20 @@ async function fetchPatternsByCategory(categoryName) {
     formData.append("category_name", categoryName);
     const res = await fetch(
       "https://terratechpacks.com/App_3D/pattern_url.php",
-      { method: "POST", body: formData }
+      { method: "POST", body: formData },
     );
     const json = await res.json();
     // Check if data is valid and return the patterns that match the selected category
     if (json.status === "success" && Array.isArray(json.data)) {
       return json.data.filter(
-        (p) => p.category_name.toLowerCase() === categoryName.toLowerCase()
+        (p) => p.category_name.toLowerCase() === categoryName.toLowerCase(),
       );
     }
     return [];
   } catch (err) {
     console.error(
       `Failed to fetch patterns for category: ${categoryName}`,
-      err
+      err,
     );
     return [];
   }
@@ -463,13 +516,13 @@ async function fetchPatternsByCategory(categoryName) {
 
 // Initialize Category Accordion with lazy loading
 async function initCategoryAccordion() {
-  const accordion = document.querySelector(".accordion");
+  const accordion = document.getElementById("patternAccordion");
   if (!accordion) return;
 
   const categories = await fetchCategories();
   let allPatterns = [];
 
-  const baseurl = 'https://terratechpacks.com/App_3D/';
+  const baseurl = "https://terratechpacks.com/App_3D/";
 
   for (const cat of categories) {
     const patterns = await fetchPatternsByCategory(cat.category);
@@ -486,7 +539,7 @@ async function initCategoryAccordion() {
     // Fix logo image source and style
     header.innerHTML = `
       <span>
-        <img src="${baseurl + cat.logo_url}" style="height:20px;width:20px;"/> ${cat.category}
+        <img src="${baseurl + cat.logo_url}" style="height:1.2vw;width:1.2vw;"/> ${cat.category}
       </span>
       <i class="fa-solid fa-angle-down drop"></i>
     `;
@@ -504,7 +557,7 @@ async function initCategoryAccordion() {
     header.addEventListener("click", async () => {
       const isOpen = header.classList.contains("active");
 
-      document.querySelectorAll(".accordion-header").forEach((h) => {
+      accordion.querySelectorAll(".accordion-header").forEach((h) => {
         if (h !== header) {
           h.classList.remove("active");
           const c = h.nextElementSibling;
@@ -528,6 +581,7 @@ async function initCategoryAccordion() {
           const loader = document.createElement("div");
           loader.className = "pattern-loader";
           loader.textContent = "Loading...";
+          loader.style.fontSize = "0.85vw";
           content.appendChild(loader);
 
           if (patterns.length) {
@@ -551,7 +605,7 @@ async function initCategoryAccordion() {
 
                   if (state.isWithoutLogoModel) {
                     const confirmed = confirm(
-                      "Selecting a new pattern will remove your custom logo. Proceed?"
+                      "Selecting a new pattern will remove your custom logo. Proceed?",
                     );
                     if (!confirmed) return;
                   }
@@ -590,23 +644,27 @@ async function initCategoryAccordion() {
                   loader.remove();
                   content.dataset.loaded = "true";
                   content.style.maxHeight = content.scrollHeight + "px";
-                  header.querySelector(".drop").className = "fa-solid fa-angle-up drop";
+                  header.querySelector(".drop").className =
+                    "fa-solid fa-angle-up drop";
                 }
               }
             });
 
             // Expand right away
             content.style.maxHeight = content.scrollHeight + "px";
-            header.querySelector(".drop").className = "fa-solid fa-angle-up drop";
+            header.querySelector(".drop").className =
+              "fa-solid fa-angle-up drop";
           } else {
             content.innerHTML = "";
             const noPattern = document.createElement("div");
             noPattern.textContent = "No patterns available for this category";
-            noPattern.style.padding = "10px";
+            noPattern.style.padding = "0.6vw";
+            noPattern.style.fontSize = "0.85vw";
             content.appendChild(noPattern);
             content.dataset.loaded = "true";
             content.style.maxHeight = content.scrollHeight + "px";
-            header.querySelector(".drop").className = "fa-solid fa-angle-up drop";
+            header.querySelector(".drop").className =
+              "fa-solid fa-angle-up drop";
           }
         } else {
           content.style.maxHeight = content.scrollHeight + "px";
@@ -668,7 +726,7 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
 
     // apply to all viewers in parallel (skip wait)
     const viewers = Array.from(
-      new Set([...(state.modelViewers || []), mainViewer].filter(Boolean))
+      new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
     );
     viewers.forEach((viewer) => {
       if (!viewer.model) return;
@@ -678,7 +736,7 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
         : PATTERN_MATERIAL_NAME;
       tryApplyMaterialTexture(viewer, materialName, patternUrl, {
         skipWait: true,
-      }).catch(() => { });
+      }).catch(() => {});
     });
 
     // efficient swatch update: only touch the previously selected and the new one
@@ -714,7 +772,7 @@ function isRectangleModel(name) {
   const keywords = ["rect", "rectangular", "biryani"];
   const result = keywords.some((k) => lower.includes(k));
   console.log(
-    `[isRectangleModel] "${name}" => ${result ? "✅ RECT" : "❌ ROUND"}`
+    `[isRectangleModel] "${name}" => ${result ? "✅ RECT" : "❌ ROUND"}`,
   );
   return result;
 }
@@ -722,7 +780,7 @@ function isRectangleModel(name) {
 /********** APPLY PATTERN TO ALL VIEWERS **********/
 async function applyPatternToAll(
   patternUrl,
-  { forceReload = false, materialOverride = null } = {}
+  { forceReload = false, materialOverride = null } = {},
 ) {
   if (!patternUrl) return;
 
@@ -736,14 +794,14 @@ async function applyPatternToAll(
   });
 
   const viewers = Array.from(
-    new Set([...(state.modelViewers || []), mainViewer].filter(Boolean))
+    new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
   );
 
   await Promise.all(
     viewers.map(async (viewer) => {
       if (!viewer.model) {
         await new Promise((resolve) =>
-          viewer.addEventListener("load", resolve, { once: true })
+          viewer.addEventListener("load", resolve, { once: true }),
         );
       }
 
@@ -765,7 +823,7 @@ async function applyPatternToAll(
         skipWait: true,
         forceReload,
       });
-    })
+    }),
   );
 }
 
@@ -813,14 +871,14 @@ async function tryApplyMaterialTexture(
   viewer,
   materialNames,
   textureUrl,
-  { skipWait = false, forceReload = false } = {}
+  { skipWait = false, forceReload = false } = {},
 ) {
   if (!viewer || !textureUrl) return;
 
   // Wait for model to load if necessary
   if (!viewer.model && !skipWait) {
     await new Promise((res) =>
-      viewer.addEventListener("load", res, { once: true })
+      viewer.addEventListener("load", res, { once: true }),
     );
   }
 
@@ -897,21 +955,19 @@ if (logoInput) {
     state.logoDataUrl = logoDataUrl;
 
     const viewers = Array.from(
-      new Set([mainViewer, ...(state.modelViewers || [])].filter(Boolean))
+      new Set([mainViewer, ...(state.modelViewers || [])].filter(Boolean)),
     );
-
 
     await Promise.all(
       viewers.map((v) =>
-        tryApplyMaterialTexture(v, LOGO_MATERIAL_NAME, state.logoDataUrl)
-      )
+        tryApplyMaterialTexture(v, LOGO_MATERIAL_NAME, state.logoDataUrl),
+      ),
     );
   });
 }
 
-const modelContainer = document.getElementById('modelcontainer');
-// modelContainer.style.backgroundColor = 'pink';
-
+const modelContainer = document.getElementById("modelcontainer");
+modelContainer.style.backgroundColor = "pink";
 
 // Elements
 const mainbg = document.getElementById("modelcontainer");
@@ -940,8 +996,9 @@ function updatePickrBorderColor(hexColor) {
   const previewButton = document.querySelector(".pickr .pcr-button");
 
   if (previewButton) {
-    previewButton.style.border = `2px solid ${brightness < 128 ? "white" : "black"
-      }`;
+    previewButton.style.border = `0.15vw solid ${
+      brightness < 128 ? "white" : "black"
+    }`;
   }
 }
 
@@ -949,7 +1006,7 @@ function updatePickrBorderColor(hexColor) {
 const pickr = Pickr.create({
   el: "#bgColorPicker",
   theme: "nano",
-  default: "#FFD3D3", 
+  default: "#fbb4ffff",
   components: {
     preview: true,
     opacity: true,
@@ -963,7 +1020,7 @@ const pickr = Pickr.create({
 
 // Restore saved color on init
 pickr.on("init", () => {
-  const savedColor = "#FFD3D3";
+  const savedColor = localStorage.getItem("bgColor") || "#ffffffff";
   applyColor(savedColor);
   pickr.setColor(savedColor);
   updatePickrBorderColor(savedColor);
@@ -988,6 +1045,40 @@ trigger.addEventListener("click", () => {
   pickr.show();
 });
 
+// Part Color Picker Initialization
+const partTrigger = document.getElementById("partColorPickerTrigger");
+const partPickr = Pickr.create({
+  el: "#partColorPicker",
+  theme: "nano",
+  default: "#ffffffff",
+  components: {
+    preview: true,
+    opacity: true,
+    hue: true,
+    interaction: {
+      input: true,
+      save: true,
+    },
+  },
+});
+
+partPickr.on("change", (color) => {
+  const hexColor = color.toHEXA().toString();
+  const currentPart = partSelect.value;
+  updateMaterialColor(currentPart, hexColor);
+
+  // Uncheck all radios if custom color is picked
+  const radios = document.querySelectorAll('input[name="color"]');
+  radios.forEach((r) => (r.checked = false));
+});
+
+partPickr.on("save", () => {
+  partPickr.hide();
+});
+
+partTrigger.addEventListener("click", () => {
+  partPickr.show();
+});
 
 function preloadImages(urls = []) {
   urls.forEach((url) => {
@@ -1101,7 +1192,7 @@ function initFabricCanvas() {
           previewLoader.style.display = "none";
         });
       },
-      { crossOrigin: "anonymous" }
+      { crossOrigin: "anonymous" },
     );
   } else {
     previewLoader.style.display = "none"; // no base image, hide loader immediately
@@ -1202,7 +1293,7 @@ function addLogoToCanvas(dataUrl) {
         }
       });
     },
-    { crossOrigin: "anonymous" }
+    { crossOrigin: "anonymous" },
   );
 }
 
@@ -1252,7 +1343,7 @@ editBtn.addEventListener("click", () => {
           updateMaterialColor(part, color, { skipWait: true });
         });
       },
-      { once: true }
+      { once: true },
     );
 
     mainViewer.src = encoded;
@@ -1360,7 +1451,7 @@ if (closeModal) {
           await tryApplyMaterialTexture(
             mainViewer,
             LOGO_MATERIAL_NAME,
-            state.logoDataUrl
+            state.logoDataUrl,
           );
         }
         Object.entries(state.selectedColors).forEach(([part, color]) => {
@@ -1369,7 +1460,7 @@ if (closeModal) {
 
         state.isWithoutLogoModel = false; // reset flag after restoring
       },
-      { once: true }
+      { once: true },
     );
 
     mainViewer.src = encoded;
@@ -1419,7 +1510,7 @@ saveLogoBtn.addEventListener("click", async () => {
       await tryApplyMaterialTexture(
         viewer,
         RECTANGLE_PATTERN_MATERIAL_NAME,
-        textureUrl
+        textureUrl,
       ); // Apply on "Top_1"
     } else {
       await tryApplyMaterialTexture(viewer, PATTERN_MATERIAL_NAME, textureUrl); // Apply on "Bottom"
@@ -1451,8 +1542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ✅ Wait for thumbnails and categories to load
-  await initThumbnails();
-  await initRectangleThumbnails();
+  await initModelAccordion();
   const allPatterns = await initCategoryAccordion(); // must return all patterns!
 
   if (mainViewer && !state.modelViewers.includes(mainViewer)) {
@@ -1462,7 +1552,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (partSelect) {
     partSelect.value = "tub";
     updatePart("tub");
-    partSelect.addEventListener("change", () => updatePart(partSelect.value));
+    partSelect.addEventListener("change", () => {
+      updatePart(partSelect.value);
+      // Sync color picker with current part's color if it's a custom hex
+      const currentColor = state.selectedColors[partSelect.value];
+      if (currentColor && currentColor.startsWith("#") && partPickr) {
+        partPickr.setColor(currentColor, true);
+      }
+    });
+  }
+
+  // Auto Rotate Toggle Logic
+  const autoRotateToggle = document.getElementById("autoRotateToggle");
+  if (autoRotateToggle && mainViewer) {
+    autoRotateToggle.addEventListener("change", (e) => {
+      updateAutoRotateSmooth(e.target.checked);
+    });
   }
 
   // ✅ Restore saved colors
