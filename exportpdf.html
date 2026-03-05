@@ -19,132 +19,177 @@
 <body>
   <div class="export_main">
     <nav class="export_nav">
-      <div>
+      <div class="nav_left">
         <img src="./assets/Logo/terratechpacks_white.png" alt="TerraTech_logo" class="nav_logo" />
       </div>
-      <div>
+      <div class="nav_center">
         <h3 style="color: aliceblue">Dual Perspective Render Capture</h3>
       </div>
-      <div>
+      <div class="nav_right">
+        <a href="index.html" class="home_link">
+          <i class="fa-solid fa-house"></i> Home
+        </a>
         <button class="export_btn" id="export_btn" disabled>
-          Export Selected PDF
+          <i class="fa-solid fa-file-pdf"></i> Export Selected PDF
         </button>
       </div>
     </nav>
+
     <div class="export_content_box">
       <div class="model_box">
         <div class="model_view" id="modelview">
-
           <model-viewer id="modelViewer" src="./assets/Model_Export/500ml Round A-1 .glb" camera-controls=""
             exposure="1" shadow-intensity="0.5" disable-tap="" disable-pan="" ar="" interaction-prompt="none"
             min-field-of-view="14deg" max-field-of-view="20deg" ar-status="not-presenting"
             camera-orbit="0deg 75deg 0.7649m">
           </model-viewer>
 
+          <div class="model-view-controls">
+            <div class="format-selector">
+              <select id="exportFormat">
+                <option value="png">PNG Format</option>
+                <option value="jpeg">JPG Format</option>
+              </select>
+            </div>
+            <button id="downloadModelBtn" class="premium-export-btn">
+              <i class="fa-solid fa-cloud-arrow-down"></i> Export Capture
+            </button>
+          </div>
         </div>
+        
         <div class="model_angle">
-          <p style="text-align: center; margin: 10px 0; font-weight: bold;">Angles</p>
+          <p><i class="fa-solid fa-camera"></i> Angles</p>
           <div class="angle-models">
             <div id="angleCardContainer"></div>
           </div>
         </div>
+        
         <div class="model_models">
-          <p style="text-align: center; margin: 10px 0; font-weight: bold;">Model List</p>
+          <p><i class="fa-solid fa-cubes"></i> Model List</p>
           <div id="modelcardContainer"></div>
         </div>
       </div>
+
       <div class="export_inputs">
         <div class="export_logo">
           <div class="custom-logo-upload">
-            <h4>Upload Custom Logo</h4>
-            <input type="file" id="customLogoInput" accept="image/*" />
+            <h4><i class="fa-solid fa-upload"></i> Custom Logo</h4>
+            <div class="file-upload-wrapper">
+              <input type="file" id="customLogoInput" accept="image/*" style="display: none;" />
+              <label for="customLogoInput" class="file-upload">
+                <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5vw;"></i> Choose Logo
+              </label>
+              <span id="logoFileName" style="font-size: 0.7vw; color: #888; margin-left: 0.5vw;">No logo chosen</span>
+            </div>
             <div class="logos">
-              <img id="customLogoPreview" alt="Custom Logo Preview"
-                style="max-width: 150px; margin-top: 10px; display: none" />
-
+              <img id="customLogoPreview" alt="Custom Logo Preview" />
             </div>
           </div>
         </div>
+
         <div class="model_input">
           <div class="input-section">
-            <div style="display: flex; align-items: center; justify-content: space-between; height: 15%;">
-              <h4>Create New Option</h4>
-              <button class="render_btn" id="renderBtn" style="font-size: 0.9vw; padding: 0.4vw 1vw;">
-                Export
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <h4><i class="fa-solid fa-plus"></i> New Option</h4>
+              <button class="render_btn" id="renderBtn">
+                Render
               </button>
             </div>
+            
             <div class="input-group">
-              <div style="display: flex; flex-direction: column; gap:0.5vw;">
-                <label for="textureTitle"
-                  style="display: flex; flex-direction: column; font-weight: bold; font-size: 0.9vw; gap: 0.4vw;">
-                  <span>Texture Name <span style="color: red;">*</span></span>
-                  <input type="text" id="textureTitle" placeholder="Enter Theme Name" style="width: 70%;" />
-                  <span id="titleWarning" style="color: red; font-size: 0.7vw; display: none;">Please enter the texture
-                    name</span>
-                </label>
+              <label for="textureTitle">Texture Name <span style="color: red;">*</span></label>
+              <input type="text" id="textureTitle" placeholder="Enter Theme Name" />
 
-                <label for="textureFile"
-                  style="display: flex; flex-direction: column; font-weight: bold; font-size: 0.9vw; gap: 0.4vw;">
-                  <span>Upload Texture <span style="color: red;">*</span></span>
-                  <div style="display: flex; align-items: center; gap: 1vw;">
+              <div class="input-row" id="textureUploadRow" style="margin-bottom: 0.5vw;">
+                <div class="input-group" id="tubTextureGroup" style="flex: 1;">
+                  <label for="textureFile" id="textureLabel">Upload Texture <span style="color: red;">*</span></label>
+                  <div class="file-upload-wrapper">
                     <input type="file" name="texture" id="textureFile" accept="image/*" style="display: none;" />
-                    <label for="textureFile" class="file-upload"
-                      style="cursor: pointer; padding: 0.3vw 0.7vw; background: #007bff; max-width: 40%; min-width: 35%; color: white; border-radius: 4px; width: 35%; font-size: 0.85vw; display: flex; justify-content: center; align-items: center;">Choose
-                      File</label>
-                    <span id="fileName" style="font-size: 0.8vw; color: #555;">No file chosen</span>
+                    <label for="textureFile" class="file-upload">Tub File</label>
+                    <span id="fileName">No file chosen</span>
                   </div>
-                  <span id="fileWarning" style="color: red; font-size: 0.7vw; display: none;">Please upload a texture
-                    file</span>
-                </label>
+                </div>
+                <div class="input-group" id="lidTextureGroup" style="flex: 1; display: none;">
+                  <label for="lidTextureFile">Lid Texture <span style="color: red;">*</span></label>
+                  <div class="file-upload-wrapper">
+                    <input type="file" id="lidTextureFile" accept="image/*" style="display: none;" />
+                    <label for="lidTextureFile" class="file-upload">Lid File</label>
+                    <span id="lidFileName">No file chosen</span>
+                  </div>
+                </div>
               </div>
             </div>
+
             <div class="input-row">
               <div class="color-control">
-                <label for="topColor">Lid Color:</label>
-                <input type="color" id="topColor" value="#ffffff" style="visibility:hidden;width:0;height:0;" />
-                <img id="topColorImg" src="./assets/pngwing.png" style="width:35px;height:35px;cursor:pointer;" />
+                <label>Tub Color</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="tubColor" value="#ffffff" />
+                  <img id="tubColorImg" src="./assets/pngwing.png" title="Choose Tub Color" />
+                </div>
               </div>
               <div class="color-control">
-                <label for="bgColor">BG Color:</label>
-                <input type="color" id="bgColor" value="#ffffff" style="visibility:hidden;width:0;height:0;" />
-                <img id="bgColorImg" src="./assets/pngwing.png" style="width:35px;height:35px;cursor:pointer;" />
+                <label>Lid Color</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="topColor" value="#ffffff" />
+                  <img id="topColorImg" src="./assets/pngwing.png" title="Choose Lid Color" />
+                </div>
+              </div>
+              <div class="color-control">
+                <label>BG Color</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="bgColor" value="#ffffff" />
+                  <img id="bgColorImg" src="./assets/pngwing.png" title="Choose Background Color" />
+                </div>
               </div>
             </div>
-            <!-- <p style="text-align: center; margin-bottom: 10px; font-weight: bold;">Select logo on PDF</p>
-            <div id="logoSelection">
-              <img src="./assets/Logo/terratechpacks.png" alt="Logo 1" class="selectable-logo"
-                style="width: 80px; cursor: pointer;" />
-              <img src="./assets/Logo/terratechpacks_white.png" alt="Logo 2" class="selectable-logo"
-                style="width: 80px; cursor: pointer;" />
-              <img src="./assets/Logo/white.png" alt="Logo 3" class="selectable-logo"
-                style="width: 80px; cursor: pointer;" />
-            </div> -->
           </div>
-
         </div>
+
         <div class="model_renders">
           <div class="render_models">
-            <div style="position: relative; width: 95%; height: 10%">
-              <h4 style="position: absolute; text-align: center; width: 100%">
-                Rendered Models
-              </h4>
-              <div style="position: absolute; right: 0; top: 0;">
+            <div class="rendered-header">
+              <h4><i class="fa-solid fa-images"></i> Rendered Models</h4>
+              <div class="render-controls">
                 <label>
                   <input type="checkbox" id="selectAllToggle" checked />
-                  Select All
+                  <span>Select All</span>
                 </label>
-                <!-- Clear All Button -->
-                <button id="clearAllBtn">Clear All</button>
+                <button id="clearAllBtn" title="Clear all rendered models">
+                  <i class="fa-solid fa-trash-can"></i> Clear All
+                </button>
               </div>
             </div>
-            <div id="renderedImages" style="height: 90%; overflow: hidden;"></div>
+            <div id="renderedImages"></div>
           </div>
         </div>
       </div>
     </div>
-    <div id="pdfLoadingOverlay">Generating PDF... Please wait</div>
+
+    <div id="pdfLoadingOverlay">
+      <div class="spinner"></div>
+      <span>Generating PDF... Please wait</span>
+    </div>
+
+    <!-- Custom Alert/Confirm Modal -->
+    <div id="customModal" class="custom-modal">
+      <div class="custom-modal-content">
+        <div class="custom-modal-header">
+          <h3 id="modalTitle">Alert</h3>
+          <span class="close-modal" id="closeModal">&times;</span>
+        </div>
+        <div class="custom-modal-body">
+          <p id="modalMessage"></p>
+        </div>
+        <div class="custom-modal-footer">
+          <button id="cancelModalBtn" class="modal-btn cancel-btn">Cancel</button>
+          <button id="confirmModalBtn" class="modal-btn confirm-btn">OK</button>
+        </div>
+      </div>
+    </div>
   </div>
   <script src="./export.js?v=2"></script>
 </body>
+
 
 </html>

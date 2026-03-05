@@ -266,6 +266,7 @@ const state = {
   patternCycleTimer: null,
   selectedColors: { lid: "white", tub: "white" }, // track last color
   isWithoutLogoModel: false,
+  allPatterns: [],
 };
 
 /********** ELEMENTS **********/
@@ -719,7 +720,7 @@ exportBtn.addEventListener("click", async () => {
 
 /********** PATTERN CYCLE (update this part) **********/
 function startPatternCycle(patternUrls = [], interval = 2000) {
-  stopPatternCycle();
+  stopPatternCycle(false);
   if (!patternUrls.length) return;
 
   let idx = 0;
@@ -765,11 +766,16 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
   }, interval);
 }
 
-function stopPatternCycle() {
+function stopPatternCycle(syncToggle = true) {
   if (state.patternCycleTimer) {
     console.log("Stopping pattern cycle");
     clearInterval(state.patternCycleTimer);
     state.patternCycleTimer = null;
+
+    if (syncToggle) {
+      const toggle = document.getElementById("autoApplyToggle");
+      if (toggle) toggle.checked = false;
+    }
   }
 }
 
@@ -1551,7 +1557,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Wait for thumbnails and categories to load
   await initModelAccordion();
-  const allPatterns = await initCategoryAccordion(); // must return all patterns!
+  state.allPatterns = await initCategoryAccordion(); // must return all patterns!
 
   if (mainViewer && !state.modelViewers.includes(mainViewer)) {
     state.modelViewers.push(mainViewer);
@@ -1578,6 +1584,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Auto Apply Toggle Logic
+  const autoApplyToggle = document.getElementById("autoApplyToggle");
+  if (autoApplyToggle) {
+    autoApplyToggle.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        if (state.allPatterns && state.allPatterns.length > 0) {
+          startPatternCycle(state.allPatterns, 2000);
+        }
+      } else {
+        stopPatternCycle();
+      }
+    });
+  }
+
   // ✅ Restore saved colors
   Object.keys(state.selectedColors).forEach((part) => {
     const savedColor =
@@ -1586,9 +1606,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ✅ Preload and cycle patterns (after loading categories)
-  if (allPatterns && allPatterns.length > 0) {
-    preloadImages(allPatterns);
-    startPatternCycle(allPatterns, 2000);
+  if (state.allPatterns && state.allPatterns.length > 0) {
+    preloadImages(state.allPatterns);
+    if (autoApplyToggle && autoApplyToggle.checked) {
+      startPatternCycle(state.allPatterns, 2000);
+    }
   }
 
   // ✅ Hide preloader

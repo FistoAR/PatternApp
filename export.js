@@ -4,16 +4,38 @@ window.addEventListener("DOMContentLoaded", () => {
   const textureTitle = document.getElementById("textureTitle");
   const textureFile = document.getElementById("textureFile");
   const topColor = document.getElementById("topColor");
+  const tubColor = document.getElementById("tubColor");
   const bgColor = document.getElementById("bgColor");
   const modelbg = document.getElementById("modelview");
   const renderBtn = document.getElementById("renderBtn");
   const exportBtn = document.getElementById("export_btn");
   const customLogoInput = document.getElementById("customLogoInput");
   const customLogoPreview = document.getElementById("customLogoPreview");
+  const clearAllBtn = document.getElementById("clearAllBtn");
+
+  // Dual Texture Upload Elements
+  const lidTextureFile = document.getElementById("lidTextureFile");
+  const lidFileName = document.getElementById("lidFileName");
+  const tubTextureGroup = document.getElementById("tubTextureGroup");
+  const lidTextureGroup = document.getElementById("lidTextureGroup");
+  const textureLabel = document.getElementById("textureLabel");
+
+  function toggleClearButtonState() {
+    if (!clearAllBtn) return;
+    if (renderedModels.length === 0) {
+      clearAllBtn.disabled = true;
+      clearAllBtn.style.opacity = "0.5";
+    } else {
+      clearAllBtn.disabled = false;
+      clearAllBtn.style.opacity = "1";
+    }
+  }
 
   const modelSrc = "./assets/model.glb";
   const materialName = "Bottom.006";
-  const TopmaterialName = "Top.006";
+  const TubMaterialNames = ["Bottom", "Bottom.006"];
+  const TopmaterialName = ["top Material", "Top.006"];
+  const Topmaterialtexture = "top Material";
   const viewerTextureCache = new WeakMap();
   let renderedModels = [];
   let cardCounter = 1;
@@ -24,7 +46,6 @@ window.addEventListener("DOMContentLoaded", () => {
   let isScrolling = false;
   let scrollTimeout;
 
-
   // Zoom levels - only 2 steps
   const zoomLevels = [0.7649, 0.55]; // [normal, slightly zoomed in]
   let currentZoomIndex = 0;
@@ -32,9 +53,12 @@ window.addEventListener("DOMContentLoaded", () => {
   let originalBottomTexture = null;
 
   modelViewer.addEventListener("load", () => {
-    const bottomMat = modelViewer.model?.materials?.find(m => m.name === materialName);
+    const bottomMat = modelViewer.model?.materials?.find(
+      (m) => m.name === materialName,
+    );
     if (bottomMat) {
-      originalBottomTexture = bottomMat.pbrMetallicRoughness.baseColorTexture?.texture || null;
+      originalBottomTexture =
+        bottomMat.pbrMetallicRoughness.baseColorTexture?.texture || null;
     }
   });
 
@@ -58,10 +82,13 @@ window.addEventListener("DOMContentLoaded", () => {
     currentZoom = Math.max(minDistance, Math.min(maxDistance, currentZoom));
 
     // Get current rotation angles from the viewer
-    const currentOrbit = modelViewer.getAttribute("camera-orbit").split(' ');
+    const currentOrbit = modelViewer.getAttribute("camera-orbit").split(" ");
 
     // Update camera with new zoom, keeping current rotation
-    modelViewer.setAttribute("camera-orbit", `${currentOrbit[0]} ${currentOrbit[1]} ${currentZoom}m`);
+    modelViewer.setAttribute(
+      "camera-orbit",
+      `${currentOrbit[0]} ${currentOrbit[1]} ${currentZoom}m`,
+    );
 
     if (!isScrolling) {
       isScrolling = true;
@@ -74,7 +101,6 @@ window.addEventListener("DOMContentLoaded", () => {
       document.body.style.cursor = "default";
     }, 150);
   }
-
 
   // modelViewer.addEventListener("wheel", handleScroll, { passive: false });
   renderedImages.addEventListener("wheel", handleScroll, { passive: false });
@@ -160,11 +186,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16) / 255,
-      g: parseInt(result[2], 16) / 255,
-      b: parseInt(result[3], 16) / 255
-    } : null;
+    return result
+      ? {
+          r: parseInt(result[1], 16) / 255,
+          g: parseInt(result[2], 16) / 255,
+          b: parseInt(result[3], 16) / 255,
+        }
+      : null;
   }
 
   function hexToRgbArray(hex) {
@@ -173,20 +201,29 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Enhanced texture and color application ---
-  async function tryApplyMaterialTexture(viewer, materialNames, textureUrl, topMaterialColor = null) {
+  async function tryApplyMaterialTexture(
+    viewer,
+    materialNames,
+    textureUrl,
+    topMaterialColor = null,
+    tubMaterialColor = null,
+  ) {
     if (!viewer || !textureUrl) return;
     if (!viewer.model) {
       await new Promise((res) =>
-        viewer.addEventListener("load", res, { once: true })
+        viewer.addEventListener("load", res, { once: true }),
       );
     }
 
-    const names = Array.isArray(materialNames) ? materialNames : [materialNames];
-    const mat = names
-      .map((n) => viewer.model?.materials?.find((m) => m.name === n))
-      .find(Boolean);
+    const names = Array.isArray(materialNames)
+      ? materialNames
+      : [materialNames];
 
-    if (mat) {
+    // Process main materials (typically for textures)
+    const targetMaterials =
+      viewer.model?.materials?.filter((m) => names.includes(m.name)) || [];
+
+    for (const mat of targetMaterials) {
       try {
         let vcache = viewerTextureCache.get(viewer) || new Map();
         viewerTextureCache.set(viewer, vcache);
@@ -198,23 +235,34 @@ window.addEventListener("DOMContentLoaded", () => {
         vcache.set(cacheKey, tex);
 
         mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
-        mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+
+        if (tubMaterialColor) {
+          const colorArray = hexToRgbArray(tubMaterialColor);
+          mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
+        } else {
+          mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+        }
+
         mat.setAlphaMode("OPAQUE");
       } catch (err) {
         console.error("Failed to apply texture:", err);
       }
     }
 
+    // Apply colors to Top and Tub if needed when not covered by texture call
     if (topMaterialColor) {
-      const topMat = viewer.model?.materials?.find((m) => m.name === TopmaterialName);
-      if (topMat) {
+      const topMats =
+        viewer.model?.materials?.filter((m) =>
+          TopmaterialName.includes(m.name),
+        ) || [];
+      const colorArray = hexToRgbArray(topMaterialColor);
+      topMats.forEach((mat) => {
         try {
-          const colorArray = hexToRgbArray(topMaterialColor);
-          topMat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
+          mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
         } catch (err) {
           console.error("Failed to apply top material color:", err);
         }
-      }
+      });
     }
   }
 
@@ -223,51 +271,129 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   topColor.addEventListener("input", () => {
-    const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
-    if (topMat) {
+    const topMats =
+      modelViewer.model?.materials?.filter((m) =>
+        TopmaterialName.includes(m.name),
+      ) || [];
+    const colorArray = hexToRgbArray(topColor.value);
+    topMats.forEach((mat) => {
+      mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
+    });
+  });
 
-      topMat.setAlphaMode('OPAQUE');
-      topMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-      topMat.pbrMetallicRoughness.setBaseColorFactor(topColor.value); 
-      topMat.pbrMetallicRoughness.setRoughnessFactor(0.5); 
-      topMat.pbrMetallicRoughness.setMetallicFactor(0.2);
-
-    }
+  tubColor.addEventListener("input", () => {
+    const mats =
+      modelViewer.model?.materials?.filter((m) =>
+        TubMaterialNames.includes(m.name),
+      ) || [];
+    const colorArray = hexToRgbArray(tubColor.value);
+    mats.forEach((mat) => {
+      mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
+    });
   });
 
   function checkFormValidity() {
-    renderBtn.disabled = false;
+    const fileWrapper = textureFile.closest(".file-upload-wrapper");
+    const lidFileWrapper = lidTextureFile.closest(".file-upload-wrapper");
+    const hasTitle = textureTitle.value.trim().length > 0;
+    const hasFile = textureFile.files.length > 0;
+
+    const isDualMode = lidTextureGroup.style.display !== "none";
+    const hasLidFile = lidTextureFile.files.length > 0;
+
+    // Highlight Title
+    if (hasTitle) {
+      textureTitle.classList.remove("error-highlight");
+      textureTitle.classList.add("valid-highlight");
+    } else {
+      textureTitle.classList.remove("valid-highlight");
+    }
+
+    // Highlight File
+    if (hasFile) {
+      fileWrapper.classList.remove("error-highlight");
+      fileWrapper.classList.add("valid-highlight");
+    } else {
+      fileWrapper.classList.remove("valid-highlight");
+    }
+
+    // Highlight Lid File (if in dual mode)
+    if (isDualMode) {
+      if (hasLidFile) {
+        lidFileWrapper.classList.remove("error-highlight");
+        lidFileWrapper.classList.add("valid-highlight");
+      } else {
+        lidFileWrapper.classList.remove("valid-highlight");
+      }
+    }
+
+    renderBtn.disabled = false; // Keep it enabled for manual trigger
   }
 
   // Update main model viewer
   async function updateMainModelViewer() {
-    const file = textureFile.files[0];
-    if (!file) return;
+    const tubFile = textureFile.files[0];
+    const lidFile = lidTextureFile.files[0];
+    const isDualMode = lidTextureGroup.style.display !== "none";
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const textureDataURL = event.target.result;
-      const topMaterialColor = topColor.value;
+    if (!tubFile && (!isDualMode || !lidFile)) return;
 
-      await tryApplyMaterialTexture(
-        modelViewer,
-        materialName,
-        textureDataURL,
-        topMaterialColor
-      );
-    };
-    reader.readAsDataURL(file);
+    const topMaterialColor = topColor.value;
+
+    if (tubFile) {
+      const tubReader = new FileReader();
+      tubReader.onload = async (event) => {
+        const textureDataURL = event.target.result;
+        await tryApplyMaterialTexture(
+          modelViewer,
+          TubMaterialNames,
+          textureDataURL,
+          !isDualMode ? topColor.value : null,
+          tubColor.value,
+        );
+      };
+      tubReader.readAsDataURL(tubFile);
+    }
+
+    if (isDualMode && lidFile) {
+      const lidReader = new FileReader();
+      lidReader.onload = async (event) => {
+        const lidTextureDataURL = event.target.result;
+        await tryApplyMaterialTexture(
+          modelViewer,
+          Topmaterialtexture,
+          lidTextureDataURL,
+          null,
+        );
+      };
+      lidReader.readAsDataURL(lidFile);
+    }
   }
 
-  function createRenderedCard(textureDataURL, title, topMaterialColor, modelSrcForCard, snapshotDataURL = null, backgroundColor = "#ffffff") {
+  function createRenderedCard(
+    tubTextureDataURL,
+    title,
+    topMaterialColor,
+    modelSrcForCard,
+    snapshotDataURL = null,
+    backgroundColor = "#ffffff",
+    lidTextureDataURL = null,
+    cameraOrbit = null,
+    fieldOfView = null,
+    tubMaterialColor = null,
+  ) {
     const card = document.createElement("div");
     card.className = "rendered-card";
     card.dataset.id = cardCounter++;
-    card.dataset.textureDataUrl = textureDataURL;
+    card.dataset.textureDataUrl = tubTextureDataURL;
+    card.dataset.lidTextureDataUrl = lidTextureDataURL || "";
     card.dataset.title = title;
     card.dataset.topMaterialColor = topMaterialColor;
+    card.dataset.tubMaterialColor = tubMaterialColor || "#ffffff";
     card.dataset.modelSrc = modelSrcForCard;
     card.dataset.backgroundColor = backgroundColor;
+    card.dataset.cameraOrbit = cameraOrbit || "";
+    card.dataset.fieldOfView = fieldOfView || "";
     card.dataset.selectedLogo = ""; // Store selected logo for this card
     if (snapshotDataURL) {
       card.dataset.snapshot = snapshotDataURL;
@@ -297,14 +423,13 @@ window.addEventListener("DOMContentLoaded", () => {
     const logoSelectionDiv = document.createElement("div");
     logoSelectionDiv.className = "card-logo-selection";
     logoSelectionDiv.innerHTML = `
-    <p style="font-size: 0.7vw; margin: 5px 0; font-weight: bold;">Select Logo:</p>
     <div class="card-logo-options">
       <img src="./assets/Logo/terratechpacks.png" data-logo="./assets/Logo/terratechpacks.png" 
-           class="card-selectable-logo" style="width:3vw; cursor: pointer; border: 2px solid #ccc; padding: 2px;" />
+           class="card-selectable-logo" />
       <img src="./assets/Logo/terratechpacks_white.png" data-logo="./assets/Logo/terratechpacks_white.png" 
-           class="card-selectable-logo" style="width: 3vw; cursor: pointer; border: 2px solid #ccc; padding: 2px;" />
+           class="card-selectable-logo" />
       <img src="./assets/Logo/white.png" data-logo="./assets/Logo/white.png" 
-           class="card-selectable-logo" style="width: 3vw; cursor: pointer; border: 2px solid #ccc; padding: 2px;" />
+           class="card-selectable-logo" />
     </div>
   `;
 
@@ -312,10 +437,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (snapshotDataURL) {
       const snapshotImg = document.createElement("img");
       snapshotImg.src = snapshotDataURL;
-      snapshotImg.style.width = "100%";
-      snapshotImg.style.height = "100%";
-      snapshotImg.style.objectFit = "contain";
-      snapshotImg.style.pointerEvents = "none";
+      snapshotImg.alt = title;
+      snapshotImg.className = "snapshot-img";
 
       card.appendChild(deleteBtn);
       card.appendChild(checkbox);
@@ -327,27 +450,33 @@ window.addEventListener("DOMContentLoaded", () => {
       const cardModelViewer = document.createElement("model-viewer");
       cardModelViewer.src = modelSrcForCard || modelSrc;
       cardModelViewer.setAttribute("camera-controls", "");
-      cardModelViewer.setAttribute("rotate", "null");
       cardModelViewer.setAttribute("exposure", "1");
       cardModelViewer.setAttribute("shadow-intensity", "0.5");
       cardModelViewer.setAttribute("disable-tap", "");
       cardModelViewer.setAttribute("disable-pan", "");
-      cardModelViewer.setAttribute("ar", "");
       cardModelViewer.setAttribute("interaction-prompt", "none");
-      // const currentRotationY = baseRotationY + currentScrollRotation;
-      // cardModelViewer.setAttribute("camera-orbit", `${currentRotationY}deg 84.49deg 0.4649m`);
       cardModelViewer.setAttribute("field-of-view", "33deg");
-      cardModelViewer.style.width = "150px";
-      cardModelViewer.style.height = "150px";
+      cardModelViewer.style.width = "100%";
+      cardModelViewer.style.height = "8vw";
       cardModelViewer.style.pointerEvents = "none";
 
       cardModelViewer.addEventListener("load", async () => {
-        await tryApplyMaterialTexture(
-          cardModelViewer,
-          materialName,
-          textureDataURL,
-          topMaterialColor
-        );
+        if (tubTextureDataURL) {
+          await tryApplyMaterialTexture(
+            cardModelViewer,
+            materialName,
+            tubTextureDataURL,
+            lidTextureDataURL ? null : topMaterialColor,
+          );
+        }
+        if (lidTextureDataURL) {
+          await tryApplyMaterialTexture(
+            cardModelViewer,
+            TopmaterialName,
+            lidTextureDataURL,
+            null,
+          );
+        }
       });
 
       card.appendChild(deleteBtn);
@@ -358,23 +487,36 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     // Add event listener for logo selection within this card
-    logoSelectionDiv.addEventListener('click', (e) => {
+    logoSelectionDiv.addEventListener("click", (e) => {
       e.stopPropagation(); // Prevent card selection
-      if (e.target.classList.contains('card-selectable-logo')) {
+      if (e.target.classList.contains("card-selectable-logo")) {
         // Remove selection from all logos in this card
-        logoSelectionDiv.querySelectorAll('.card-selectable-logo').forEach(logo => {
-          logo.style.border = '2px solid #ccc';
-        });
+        logoSelectionDiv
+          .querySelectorAll(".card-selectable-logo")
+          .forEach((logo) => {
+            logo.classList.remove("selected-logo");
+          });
         // Highlight selected logo
-        e.target.style.border = '2px solid green';
+        e.target.classList.add("selected-logo");
         // Store selected logo in card dataset
         card.dataset.selectedLogo = e.target.dataset.logo;
       }
     });
 
+    // Set default logo selection (first logo)
+    const firstLogo = logoSelectionDiv.querySelector(".card-selectable-logo");
+    if (firstLogo) {
+      firstLogo.classList.add("selected-logo");
+      card.dataset.selectedLogo = firstLogo.dataset.logo;
+    }
+
     card.onclick = (e) => {
-      if (e.target === checkbox || e.target === deleteBtn ||
-        e.target.classList.contains('card-selectable-logo')) return;
+      if (
+        e.target === checkbox ||
+        e.target === deleteBtn ||
+        e.target.classList.contains("card-selectable-logo")
+      )
+        return;
       checkbox.checked = !checkbox.checked;
       toggleCardSelection(card, checkbox.checked);
     };
@@ -419,17 +561,20 @@ window.addEventListener("DOMContentLoaded", () => {
     } else {
       exportBtn.textContent = `Export ${selectedCount} Selected PDF`;
     }
+
+    // Also toggle the Clear All button based on selection
+    if (typeof toggleClearButtonState === "function") {
+      toggleClearButtonState();
+    }
   }
 
   // Event listeners
   textureTitle.addEventListener("input", checkFormValidity);
   textureFile.addEventListener("change", () => {
-    const fileName = document.getElementById("fileName");
-    const fileWarning = document.getElementById("fileWarning");
-
+    const fileWrapper = textureFile.closest(".file-upload-wrapper");
     if (textureFile.files.length > 0) {
       fileName.textContent = textureFile.files[0].name;
-      fileWarning.style.display = "none";
+      fileWrapper.classList.remove("error-highlight");
     } else {
       fileName.textContent = "No file chosen";
     }
@@ -437,156 +582,177 @@ window.addEventListener("DOMContentLoaded", () => {
     checkFormValidity();
     updateMainModelViewer();
   });
+
+  lidTextureFile.addEventListener("change", () => {
+    if (lidTextureFile.files.length > 0) {
+      lidFileName.textContent = lidTextureFile.files[0].name;
+      lidTextureFile
+        .closest(".file-upload-wrapper")
+        .classList.remove("error-highlight");
+    } else {
+      lidFileName.textContent = "No file chosen";
+    }
+    checkFormValidity();
+    updateMainModelViewer();
+  });
+
   topColor.addEventListener("change", updateMainModelViewer);
 
   renderBtn.addEventListener("click", async () => {
-    const file = textureFile.files[0];
+    const tubFile = textureFile.files[0];
+    const lidFile = lidTextureFile.files[0];
     const title = textureTitle.value.trim();
     const topMaterialColor = topColor.value;
     const backgroundColor = bgColor.value;
-    const fileName = document.getElementById("fileName");
+    const isDualMode = lidTextureGroup.style.display !== "none";
 
-    // Get warning elements
-    const titleWarning = document.getElementById("titleWarning");
-    const fileWarning = document.getElementById("fileWarning");
+    const fileWrapper = textureFile.closest(".file-upload-wrapper");
+    const lidFileWrapper = lidTextureFile.closest(".file-upload-wrapper");
 
-    // Reset warnings
-    titleWarning.style.display = "none";
-    fileWarning.style.display = "none";
+    // Reset highlights
+    textureTitle.classList.remove("error-highlight");
+    fileWrapper.classList.remove("error-highlight");
+    lidFileWrapper.classList.remove("error-highlight");
 
     // Validate
     let isValid = true;
 
     if (!title) {
-      titleWarning.style.display = "block";
-      // Auto-hide after 5 seconds
-      setTimeout(() => {
-        titleWarning.style.display = "none";
-      }, 2000);
+      textureTitle.classList.remove("valid-highlight");
+      textureTitle.classList.add("error-highlight");
+      setTimeout(() => textureTitle.classList.remove("error-highlight"), 2000);
       isValid = false;
     }
 
-    if (!file) {
-      fileWarning.style.display = "block";
-      // Auto-hide after 5 seconds
-      setTimeout(() => {
-        fileWarning.style.display = "none";
-      }, 2000);
+    if (!tubFile) {
+      fileWrapper.classList.remove("valid-highlight");
+      fileWrapper.classList.add("error-highlight");
+      setTimeout(() => fileWrapper.classList.remove("error-highlight"), 2000);
       isValid = false;
     }
 
+    if (isDualMode && !lidFile) {
+      lidFileWrapper.classList.remove("valid-highlight");
+      lidFileWrapper.classList.add("error-highlight");
+      setTimeout(
+        () => lidFileWrapper.classList.remove("error-highlight"),
+        2000,
+      );
+      isValid = false;
+    }
 
-    // Stop if validation fails
     if (!isValid) {
       return;
     }
 
+    const tubReader = new FileReader();
+    tubReader.onload = async (event) => {
+      const tubTextureDataURL = event.target.result;
+      let lidTextureDataURL = null;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const textureDataURL = event.target.result;
-      const currentModelSrc = modelViewer.getAttribute("src");
-
-
-      let snapshotDataURL = null;
-      try {
-        // Create a temporary canvas to composite model with background
-        const blob = await modelViewer.toBlob({ idealAspect: false });
-        const modelImg = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
+      const finalizeRender = async (lidDataURL) => {
+        const currentModelSrc = modelViewer.getAttribute("src");
+        let snapshotDataURL = null;
+        try {
+          const modelDataURL = modelViewer.toDataURL({ mimeType: "image/png" });
+          const modelImg = await new Promise((resolve) => {
             const img = new Image();
             img.onload = () => resolve(img);
-            img.src = reader.result;
-          };
-          reader.readAsDataURL(blob);
-        });
-
-        // Create canvas with background color
-        const canvas = document.createElement('canvas');
-        canvas.width = modelImg.width;
-        canvas.height = modelImg.height;
-        const ctx = canvas.getContext('2d');
-
-        // Fill background
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw model on top
-        ctx.drawImage(modelImg, 0, 0);
-
-        // Convert to data URL
-        snapshotDataURL = canvas.toDataURL('image/png');
-        console.log("Snapshot with background captured successfully");
-      } catch (err) {
-        console.error("Failed to capture model snapshot:", err);
-      }
-
-      const card = createRenderedCard(textureDataURL, title, topMaterialColor, currentModelSrc, snapshotDataURL, backgroundColor);
-      renderedImages.appendChild(card);
-      renderedModels.push(card);
-      card.classList.add("selected");
-      updateSelectionInfo();
-
-      // Clear form
-      textureTitle.value = "";
-      textureFile.value = "";
-      fileName.textContent = "No file chosen";
-
-      topColor.value = "#ffffff";
-      bgColor.value = "#ffffff";
-
-      modelbg.style.backgroundColor = "#c7c7c7";
-      checkFormValidity();
-
-      // Reset model materials
-      if (!modelViewer.model) {
-        await new Promise(res => modelViewer.addEventListener("load", res, { once: true }));
-      }
-
-      const bottomMat = modelViewer.model.materials.find(m => m.name === materialName);
-      if (bottomMat) {
-        if (originalBottomTexture) {
-          bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(originalBottomTexture);
-        } else {
-          bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+            img.src = modelDataURL;
+          });
+          const canvas = document.createElement("canvas");
+          canvas.width = modelImg.width;
+          canvas.height = modelImg.height;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = backgroundColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(modelImg, 0, 0);
+          snapshotDataURL = canvas.toDataURL("image/png", 1.0);
+        } catch (err) {
+          console.error("Failed to capture model snapshot:", err);
         }
 
-        bottomMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-        bottomMat.setAlphaMode("OPAQUE");
-      }
+        const card = createRenderedCard(
+          tubTextureDataURL,
+          title,
+          topMaterialColor,
+          currentModelSrc,
+          snapshotDataURL,
+          backgroundColor,
+          lidDataURL,
+          modelViewer.getAttribute("camera-orbit"),
+          modelViewer.getAttribute("field-of-view"),
+          tubColor.value,
+        );
+        renderedImages.appendChild(card);
+        renderedModels.push(card);
+        card.classList.add("selected");
+        updateSelectionInfo();
 
-      const topMat = modelViewer.model.materials.find(m => m.name === TopmaterialName);
-      if (topMat) {
-        topMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+        // Clear form
+        textureTitle.value = "";
+        textureFile.value = "";
+        fileName.textContent = "No file chosen";
+        lidTextureFile.value = "";
+        lidFileName.textContent = "No file chosen";
+        topColor.value = "#ffffff";
+        bgColor.value = "#ffffff";
+        modelbg.style.backgroundColor = "#c7c7c7";
+        checkFormValidity();
+
+        // Reset model materials
+        if (modelViewer.model) {
+          const bottomMat = modelViewer.model.materials.find(
+            (m) => m.name === materialName,
+          );
+          if (bottomMat) {
+            bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(
+              originalBottomTexture || null,
+            );
+            bottomMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+          }
+          const topMat = modelViewer.model.materials.find(
+            (m) => m.name === TopmaterialName,
+          );
+          if (topMat) {
+            topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+            topMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+          }
+        }
+      };
+
+      if (isDualMode && lidFile) {
+        const lidReader = new FileReader();
+        lidReader.onload = (e) => finalizeRender(e.target.result);
+        lidReader.readAsDataURL(lidFile);
+      } else {
+        finalizeRender(null);
       }
     };
-    reader.readAsDataURL(file);
+    tubReader.readAsDataURL(tubFile);
   });
 
-  // Lid color picker via image
-  document.getElementById("topColorImg").addEventListener("click", function () {
-    document.getElementById("topColor").click();
+  // Lid color picker live preview
+  topColor.addEventListener("input", function (e) {
+    const pickedColor = e.target.value;
+    if (modelViewer.model) {
+      const topMat = modelViewer.model.materials.find(
+        (m) => m.name === TopmaterialName,
+      );
+      if (topMat) {
+        const rgb = hexToRgbArray(pickedColor);
+        topMat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1]);
+        // Also ensure it's not metallic/rough for a clean look
+        topMat.pbrMetallicRoughness.setMetallicFactor(0);
+        topMat.pbrMetallicRoughness.setRoughnessFactor(1);
+      }
+    }
   });
 
-
-  // document.getElementById("topColor").addEventListener("input", function (e) {
-  //   const pickedColor = e.target.value;
-  //   const topMat = modelViewer.model?.materials?.find(m => m.name === TopmaterialName);
-  //   if (topMat) {
-  //     const rgb = hexToRgbArray(pickedColor);
-  //     topMat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1]);
-  //     topMat.pbrMetallicRoughness.setMetallicFactor(0);
-  //     topMat.pbrMetallicRoughness.setRoughnessFactor(1);
-  //   }
-  // });
-
-  // BG color picker via image
-  document.getElementById("bgColorImg").addEventListener("click", function () {
-    document.getElementById("bgColor").click();
-  });
-  document.getElementById("bgColor").addEventListener("input", function (e) {
-    modelbg.style.backgroundColor = e.target.value;
+  // BG color picker live preview
+  bgColor.addEventListener("input", function (e) {
+    // Set 'background' to override the default radial-gradient in CSS
+    modelbg.style.background = e.target.value;
   });
 
   const selectAllToggle = document.getElementById("selectAllToggle");
@@ -596,14 +762,14 @@ window.addEventListener("DOMContentLoaded", () => {
     renderedModels = [];
 
     if (selectAllToggle.checked) {
-      allCards.forEach(card => {
+      allCards.forEach((card) => {
         card.classList.add("selected");
         const checkbox = card.querySelector(".selection-checkbox");
         if (checkbox) checkbox.checked = true;
         renderedModels.push(card);
       });
     } else {
-      allCards.forEach(card => {
+      allCards.forEach((card) => {
         card.classList.remove("selected");
         const checkbox = card.querySelector(".selection-checkbox");
         if (checkbox) checkbox.checked = false;
@@ -615,8 +781,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   renderedImages.addEventListener("change", (event) => {
     if (event.target.classList.contains("selection-checkbox")) {
-      const allCheckboxes = renderedImages.querySelectorAll(".selection-checkbox");
-      const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+      const allCheckboxes = renderedImages.querySelectorAll(
+        ".selection-checkbox",
+      );
+      const allChecked = Array.from(allCheckboxes).every((cb) => cb.checked);
 
       selectAllToggle.checked = allChecked;
 
@@ -629,7 +797,7 @@ window.addEventListener("DOMContentLoaded", () => {
           }
         } else {
           card.classList.remove("selected");
-          renderedModels = renderedModels.filter(c => c !== card);
+          renderedModels = renderedModels.filter((c) => c !== card);
         }
       }
 
@@ -638,16 +806,20 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Custom logo upload preview
-  customLogoInput.addEventListener('change', e => {
+  customLogoInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
+    const logoFileNameText = document.getElementById("logoFileName");
     if (file) {
+      logoFileNameText.textContent = file.name;
       const reader = new FileReader();
-      reader.onload = event => {
+      reader.onload = (event) => {
         customLogoPreview.src = event.target.result;
-        customLogoPreview.style.display = 'block';
+        customLogoPreview.style.display = "block";
         customLogoPreview.dataset.preview = event.target.result;
       };
       reader.readAsDataURL(file);
+    } else {
+      logoFileNameText.textContent = "No logo chosen";
     }
   });
 
@@ -663,138 +835,247 @@ window.addEventListener("DOMContentLoaded", () => {
   //   }
   // });
 
-  const clearAllBtn = document.getElementById('clearAllBtn');
+  // --- Clear All Functionality ---
 
-  function toggleClearButtonState() {
-    if (window.renderedModels && window.renderedModels.length === 0) {
-      clearAllBtn.disabled = true;
-      clearAllBtn.style.cursor = "none";
-    } else {
-      clearAllBtn.disabled = false;
-    }
-  }
+  clearAllBtn.addEventListener("click", () => {
+    showCustomModal({
+      title: "Clear All Renders",
+      message:
+        "Are you sure you want to clear all rendered models? This action cannot be undone.",
+      type: "confirm",
+      onConfirm: () => {
+        renderedModels.length = 0;
+        renderedImages.innerHTML = "";
+        console.log("Cleared all rendered models");
 
-  clearAllBtn.addEventListener('click', () => {
-    const confirmClear = confirm('Are you sure you want to clear all rendered models?');
+        // Update UI states
+        updateSelectionInfo();
+        toggleClearButtonState();
 
-    if (confirmClear) {
-      if (window.renderedModels) {
-        window.renderedModels.length = 0;
-      }
-
-      renderedImages.innerHTML = '';
-      console.log('Cleared all rendered models');
-      alert('All rendered models have been cleared!');
-      toggleClearButtonState();
-    } else {
-      console.log('Clearing action was canceled');
-    }
+        showCustomModal({
+          title: "Success",
+          message: "All rendered models have been cleared!",
+          type: "alert",
+        });
+      },
+    });
   });
 
   toggleClearButtonState();
 
-  const models = [
+  const categorizedModels = [
     {
-      name: '500ml Model',
-      frontSrc: './assets/Model_Export/500ml Round A-1 .glb',
-      angles: [
-        { name: 'Front', src: './assets/Model_Export/500ml Round A-1 .glb', cameraOrbit: '0deg 75deg 0.3644m', minCameraOrbit: '-Infinity auto 0.55m' },
-        { name: 'Side', src: './assets/Model_Export/500ml Round A-2 .glb', cameraOrbit: '10deg 78deg  0.7649m', minCameraOrbit: '-Infinity auto 0.55m' },
-        { name: 'Back', src: './assets/Model_Export/500ml Round A-3 .glb', cameraOrbit: '-340.4999816894526deg 84.49deg 0.7649m', minCameraOrbit: '-Infinity auto 0.65m' }
-      ]
+      category: "Round",
+      models: [
+        {
+          name: "500ml Round",
+          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          angles: [
+            {
+              name: "Front",
+              src: "./assets/Model_Export/500ml Round A-1 .glb",
+              cameraOrbit: "0deg 75deg 0.3644m",
+              minCameraOrbit: "-Infinity auto 0.55m",
+            },
+            {
+              name: "Side",
+              src: "./assets/Model_Export/500ml Round A-2 .glb",
+              cameraOrbit: "10deg 78deg  0.7649m",
+              minCameraOrbit: "-Infinity auto 0.55m",
+            },
+            {
+              name: "Back",
+              src: "./assets/Model_Export/500ml Round A-3 .glb",
+              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
+              minCameraOrbit: "-Infinity auto 0.65m",
+            },
+          ],
+        },
+        {
+          name: "300ml Round",
+          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          angles: [
+            {
+              name: "Front",
+              src: "./assets/Model_Export/500ml Round A-1 .glb",
+              cameraOrbit: "0deg 75deg 0.3644m",
+              minCameraOrbit: "-Infinity auto 0.55m",
+            },
+            {
+              name: "Side",
+              src: "./assets/Model_Export/500ml Round A-2 .glb",
+              cameraOrbit: "10deg 78deg  0.7649m",
+              minCameraOrbit: "-Infinity auto 0.55m",
+            },
+            {
+              name: "Back",
+              src: "./assets/Model_Export/500ml Round A-3 .glb",
+              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
+              minCameraOrbit: "-Infinity auto 0.65m",
+            },
+          ],
+        },
+      ],
     },
     {
-      name: '250ml Model',
-      frontSrc: './assets/Model_Export/250  SB A-1.glb',
-      angles: [
-        { name: 'Front', src: './assets/Model_Export/250  SB A-1.glb', cameraOrbit: '340deg 68deg 0.5m', minCameraOrbit: '-Infinity auto 1.15m' },
-        { name: 'Side', src: './assets/Model_Export/250  SB A-2.glb', cameraOrbit: '337deg 68deg 0.5m', minCameraOrbit: '-Infinity auto 1.15m' },
-        { name: 'Back', src: './assets/Model_Export/250  SB A-3.glb', cameraOrbit: '320deg 70deg 0.65m', minCameraOrbit: '-Infinity auto 1.49m' }
-      ]
-    }
+      category: "Square",
+      models: [
+        {
+          name: "250ml SB",
+          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          angles: [
+            {
+              name: "Front",
+              src: "./assets/Model_Export/250  SB A-1.glb",
+              cameraOrbit: "340deg 68deg 0.5m",
+              minCameraOrbit: "-Infinity auto 1.15m",
+            },
+            {
+              name: "Side",
+              src: "./assets/Model_Export/250  SB A-2.glb",
+              cameraOrbit: "337deg 68deg 0.5m",
+              minCameraOrbit: "-Infinity auto 1.15m",
+            },
+            {
+              name: "Back",
+              src: "./assets/Model_Export/250  SB A-3.glb",
+              cameraOrbit: "320deg 70deg 0.65m",
+              minCameraOrbit: "-Infinity auto 1.49m",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      category: "Square TE",
+      models: [
+        {
+          name: "250ml SB",
+          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          angles: [
+            {
+              name: "Front",
+              src: "./assets/Model_Export/250  SB A-1.glb",
+              cameraOrbit: "340deg 68deg 0.5m",
+              minCameraOrbit: "-Infinity auto 1.15m",
+            },
+            {
+              name: "Side",
+              src: "./assets/Model_Export/250  SB A-2.glb",
+              cameraOrbit: "337deg 68deg 0.5m",
+              minCameraOrbit: "-Infinity auto 1.15m",
+            },
+            {
+              name: "Back",
+              src: "./assets/Model_Export/250  SB A-3.glb",
+              cameraOrbit: "320deg 70deg 0.65m",
+              minCameraOrbit: "-Infinity auto 1.49m",
+            },
+          ],
+        },
+      ],
+    },
   ];
 
+  // Flatten models for internal logic compatibility
+  const models = categorizedModels.flatMap((cat) => cat.models);
+
   const angleIcons = {
-    '500ml': {
-      Front: './assets/Angles/500ml/500ml_angle1.webp',
-      Side: './assets/Angles/500ml/500ml_angle2.webp',
-      Back: './assets/Angles/500ml/500ml_angle3.webp',
+    "500ml": {
+      Front: "./assets/Angles/500ml/500ml_angle1.webp",
+      Side: "./assets/Angles/500ml/500ml_angle2.webp",
+      Back: "./assets/Angles/500ml/500ml_angle3.webp",
     },
-    '250ml': {
-      Front: './assets/Angles/250ml/250ml_1.webp',
-      Side: './assets/Angles/250ml/250ml_2.webp',
-      Back: './assets/Angles/250ml/250ml_3.webp',
-    }
+    "250ml": {
+      Front: "./assets/Angles/250ml/250ml_1.webp",
+      Side: "./assets/Angles/250ml/250ml_2.webp",
+      Back: "./assets/Angles/250ml/250ml_3.webp",
+    },
   };
 
-  const modelContainer = document.getElementById('modelcardContainer');
-  const angleContainer = document.getElementById('angleCardContainer');
-  const mainModelViewer = document.getElementById('modelViewer');
+  const modelContainer = document.getElementById("modelcardContainer");
+  const angleContainer = document.getElementById("angleCardContainer");
+  const mainModelViewer = document.getElementById("modelViewer");
 
   let selectedModelIndex = null;
   let selectedAngleIndex = null;
 
   function renderModels() {
-    modelContainer.innerHTML = '';
-    models.forEach((model, i) => {
-      const modelCard = document.createElement('div');
-      modelCard.style.cursor = 'pointer';
-      modelCard.style.padding = '10px';
-      modelCard.style.marginBottom = '5px';
-      modelCard.style.border = '1px solid #ccc';
-      modelCard.style.borderRadius = '5px';
-      modelCard.style.textAlign = 'center';
-      modelCard.style.width = "13vw";
-      modelCard.style.height = "8vw";
-      modelCard.style.boxSizing = "border-box";
-      modelCard.style.display = "flex";
-      modelCard.style.flexDirection = "column"
-      modelCard.style.alignItems = "center";
-      modelCard.style.justifyContent = "center";
+    modelContainer.innerHTML = "";
+    let overallModelIndex = 0;
 
-      const mv = document.createElement('model-viewer');
-      mv.src = model.frontSrc;
-      mv.style.width = "100%";
-      mv.style.height = "100%";
-      mv.style.objectFit = "contain";
-      mv.setAttribute("disable-tap", "");
-      mv.setAttribute("disable-pan", "");
-      mv.setAttribute("interaction-prompt", "none");
-      mv.setAttribute("camera-orbit", model.angles[0].cameraOrbit);
-      mv.setAttribute("field-of-view", "25deg");
-      mv.setAttribute("shadow-intensity", "0");
-      mv.removeAttribute('environment-image');
-      mv.setAttribute("exposure", "1");
+    categorizedModels.forEach((categoryData, catIdx) => {
+      const categoryEl = document.createElement("div");
+      categoryEl.className = "model-category-item";
+      if (catIdx === 0) categoryEl.classList.add("open");
 
+      categoryEl.innerHTML = `
+        <div class="model-category-header">
+          <span>${categoryData.name || categoryData.category}</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </div>
+      `;
 
+      const header = categoryEl.querySelector(".model-category-header");
+      const wrapper = document.createElement("div");
+      wrapper.className = "model-category-content-wrapper";
+      const content = document.createElement("div");
+      content.className = "model-category-content";
 
-      const label = document.createElement('div');
-      label.textContent = model.name;
-      label.style.fontSize = "0.85vw";
-      label.style.fontWeight = "600";
-      label.style.marginTop = "0.5vw";
+      header.onclick = () => {
+        // Close others for exclusive accordion
+        document.querySelectorAll(".model-category-item").forEach((item) => {
+          if (item !== categoryEl) item.classList.remove("open");
+        });
+        categoryEl.classList.toggle("open");
+      };
 
-      modelCard.appendChild(mv);
-      modelCard.appendChild(label);
+      categoryData.models.forEach((model) => {
+        const mIdx = overallModelIndex++;
+        const modelCard = document.createElement("div");
+        modelCard.className = "model-card-item";
+        modelCard.dataset.index = mIdx;
 
-      modelCard.addEventListener('click', () => {
-        selectedModelIndex = i;
-        selectedAngleIndex = 0;
+        const mv = document.createElement("model-viewer");
+        mv.src = model.frontSrc;
+        mv.setAttribute("disable-tap", "");
+        mv.setAttribute("disable-pan", "");
+        mv.setAttribute("interaction-prompt", "none");
+        mv.setAttribute("camera-orbit", model.angles[0].cameraOrbit);
+        mv.setAttribute("field-of-view", "35deg");
+        mv.setAttribute("shadow-intensity", "0");
+        mv.setAttribute("exposure", "1");
 
-        highlightSelected(modelContainer, selectedModelIndex);
-        renderAngles();
-        highlightSelected(angleContainer, 0);
-        updateMainViewer();
+        const label = document.createElement("div");
+        label.textContent = model.name;
+
+        modelCard.appendChild(mv);
+        modelCard.appendChild(label);
+
+        modelCard.addEventListener("click", (e) => {
+          e.stopPropagation(); // Prevent accordion toggle
+          selectedModelIndex = mIdx;
+          selectedAngleIndex = 0;
+
+          highlightSelectedInAccordion();
+          renderAngles();
+          highlightSelected(angleContainer, 0);
+          updateMainViewer();
+        });
+
+        content.appendChild(modelCard);
       });
 
-      modelContainer.appendChild(modelCard);
+      wrapper.appendChild(content);
+      categoryEl.appendChild(wrapper);
+      modelContainer.appendChild(categoryEl);
     });
 
+    // Default Selection
     if (models.length > 0) {
       selectedModelIndex = 0;
       selectedAngleIndex = 0;
-
-      highlightSelected(modelContainer, 0);
+      highlightSelectedInAccordion();
       renderAngles();
       setTimeout(() => {
         highlightSelected(angleContainer, 0);
@@ -803,45 +1084,38 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function highlightSelectedInAccordion() {
+    document.querySelectorAll(".model-card-item").forEach((card) => {
+      if (parseInt(card.dataset.index) === selectedModelIndex) {
+        card.classList.add("active");
+        // Ensure its parent category is open
+        card.closest(".model-category-item").classList.add("open");
+      } else {
+        card.classList.remove("active");
+      }
+    });
+  }
+
   function renderAngles() {
-    angleContainer.innerHTML = '';
+    angleContainer.innerHTML = "";
 
     if (selectedModelIndex === null) return;
 
     const selectedModel = models[selectedModelIndex];
-    const modelName = selectedModel.name.includes('500ml') ? '500ml' : '250ml';
+    const modelName = selectedModel.name.includes("500ml") ? "500ml" : "250ml";
     const iconSet = angleIcons[modelName];
 
     selectedModel.angles.forEach((angle, i) => {
-      const angleCard = document.createElement('div');
-      angleCard.style.cursor = 'pointer';
-      angleCard.style.border = '1px solid #ccc';
-      angleCard.style.borderRadius = '5px';
-      angleCard.style.padding = '8px';
-      angleCard.style.display = 'inline-block';
-      angleCard.style.margin = '0 20px ';
-      angleCard.style.minWidth = '6.5vw';
-      angleCard.style.textAlign = 'center';
+      const angleCard = document.createElement("div");
+      angleCard.className = "angle-card-item";
 
-      const img = document.createElement('img');
+      const img = document.createElement("img");
       img.src = iconSet[angle.name];
       img.alt = angle.name;
-      img.style.width = "100%";
-      img.style.height = "100%";
-      img.style.objectFit = "cover";
-      img.style.display = "block";
-      img.style.margin = "0";
-
-
-      const label = document.createElement('div');
-      label.textContent = angle.name;
-      label.style.fontSize = "12px";
-      label.style.textAlign = "center";
 
       angleCard.appendChild(img);
-      // angleCard.appendChild(label);
 
-      angleCard.addEventListener('click', () => {
+      angleCard.addEventListener("click", () => {
         selectedAngleIndex = i;
         highlightSelected(angleContainer, selectedAngleIndex);
         updateMainViewer();
@@ -849,20 +1123,37 @@ window.addEventListener("DOMContentLoaded", () => {
 
       angleContainer.appendChild(angleCard);
     });
+
+    // Update upload UI based on category
+    const category = categorizedModels.find((c) =>
+      c.models.includes(selectedModel),
+    )?.category;
+    if (category === "Square" || category === "Square TE") {
+      lidTextureGroup.style.display = "flex";
+      textureLabel.innerHTML = 'Tub Texture <span style="color: red;">*</span>';
+    } else {
+      lidTextureGroup.style.display = "none";
+      textureLabel.innerHTML =
+        'Upload Texture <span style="color: red;">*</span>';
+    }
+    checkFormValidity();
   }
 
   function updateMainViewer() {
     if (selectedModelIndex === null || selectedAngleIndex === null) return;
 
     const selectedAngle = models[selectedModelIndex].angles[selectedAngleIndex];
-    mainModelViewer.setAttribute('src', selectedAngle.src);
-    mainModelViewer.setAttribute('min-camera-orbit', selectedAngle.minCameraOrbit);
-    mainModelViewer.setAttribute('shadow-intensity', '0'); // Add this
-    mainModelViewer.setAttribute('exposure', '1'); // Add this
-    mainModelViewer.setAttribute('environment-image', 'neutral');
+    mainModelViewer.setAttribute("src", selectedAngle.src);
+    mainModelViewer.setAttribute(
+      "min-camera-orbit",
+      selectedAngle.minCameraOrbit,
+    );
+    mainModelViewer.setAttribute("shadow-intensity", "0"); // Add this
+    mainModelViewer.setAttribute("exposure", "1"); // Add this
+    mainModelViewer.setAttribute("environment-image", "neutral");
 
     // Parse the stored camera orbit to get rotation angles
-    const orbitParts = selectedAngle.cameraOrbit.split(' ');
+    const orbitParts = selectedAngle.cameraOrbit.split(" ");
     const rotationX = orbitParts[0]; // e.g., '0deg'
     const rotationY = orbitParts[1]; // e.g., '75deg'
 
@@ -871,13 +1162,66 @@ window.addEventListener("DOMContentLoaded", () => {
     currentZoomIndex = 0;
 
     // Apply stored rotation with current zoom level
-    mainModelViewer.setAttribute('camera-orbit', `${rotationX} ${rotationY} ${currentZoom}m`);
+    mainModelViewer.setAttribute(
+      "camera-orbit",
+      `${rotationX} ${rotationY} ${currentZoom}m`,
+    );
   }
-
 
   function highlightSelected(container, index) {
     Array.from(container.children).forEach((child, i) => {
-      child.style.borderColor = i === index ? 'green' : '#ccc';
+      if (i === index) {
+        child.classList.add("active");
+      } else {
+        child.classList.remove("active");
+      }
+    });
+  }
+
+  // Helper to trim transparent pixels from an image (Optimized)
+  async function trimTransparency(dataUrl) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const w = canvas.width;
+        const h = canvas.height;
+        let rmin = h,
+          rmax = 0,
+          cmin = w,
+          cmax = 0;
+
+        for (let r = 0; r < h; r++) {
+          for (let c = 0; c < w; c++) {
+            if (data[(r * w + c) * 4 + 3] > 0) {
+              if (r < rmin) rmin = r;
+              if (r > rmax) rmax = r;
+              if (c < cmin) cmin = c;
+              if (c > cmax) cmax = c;
+            }
+          }
+        }
+
+        if (rmax < rmin || cmax < cmin) return resolve(dataUrl);
+
+        const width = cmax - cmin + 1;
+        const height = rmax - rmin + 1;
+        const trimmed = document.createElement("canvas");
+        trimmed.width = width;
+        trimmed.height = height;
+        trimmed
+          .getContext("2d")
+          .drawImage(canvas, cmin, rmin, width, height, 0, 0, width, height);
+        resolve(trimmed.toDataURL("image/png"));
+      };
+      img.src = dataUrl;
     });
   }
 
@@ -885,12 +1229,45 @@ window.addEventListener("DOMContentLoaded", () => {
   renderAngles();
 
   // --- PDF-specific model viewer creation ---
-  async function createPDFModelViewer(modelSrcForCard, textureDataURL, topMaterialColor = null, customSize = 800) {
+  async function createPDFModelViewer(
+    modelSrcForCard,
+    tubTextureDataURL,
+    topMaterialColor = null,
+    customSize = 800,
+    lidTextureDataURL = null,
+    cameraOrbit = null,
+    fieldOfView = null,
+    tubMaterialColor = null,
+  ) {
     console.log("Creating PDF model viewer...");
 
     const pdfModelViewer = document.createElement("model-viewer");
     pdfModelViewer.src = modelSrcForCard || modelSrc;
-    pdfModelViewer.setAttribute("camera-orbit", "-540.9deg 84.49deg 0.4649m");
+
+    // Use the stored orbit if available, but set distance to 'auto' to ensure it fits perfectly
+    if (cameraOrbit) {
+      const parts = cameraOrbit.split(" ");
+      if (parts.length >= 2) {
+        pdfModelViewer.setAttribute(
+          "camera-orbit",
+          `${parts[0]} ${parts[1]} auto`,
+        );
+      } else {
+        pdfModelViewer.setAttribute("camera-orbit", "auto auto auto");
+      }
+    } else {
+      pdfModelViewer.setAttribute("camera-orbit", "auto auto auto");
+    }
+
+    if (fieldOfView) {
+      pdfModelViewer.setAttribute("field-of-view", fieldOfView);
+    } else {
+      pdfModelViewer.setAttribute("field-of-view", "auto");
+    }
+
+    pdfModelViewer.setAttribute("camera-target", "0m 0m 0m");
+    pdfModelViewer.setAttribute("min-camera-orbit", "auto auto auto");
+    pdfModelViewer.setAttribute("max-camera-orbit", "auto auto auto");
     pdfModelViewer.setAttribute("disable-tap", "");
     pdfModelViewer.setAttribute("disable-pan", "");
     pdfModelViewer.setAttribute("interaction-prompt", "none");
@@ -902,10 +1279,7 @@ window.addEventListener("DOMContentLoaded", () => {
     pdfModelViewer.style.top = "50%";
     pdfModelViewer.style.transform = "translate(-50%, -50%)";
     pdfModelViewer.style.zIndex = "-1";
-    pdfModelViewer.style.backgroundColor = "rgba(255, 255, 255, 0.95)";
-    pdfModelViewer.style.border = "2px solid #ccc";
-    pdfModelViewer.style.borderRadius = "10px";
-    pdfModelViewer.style.boxShadow = "0 4px 20px rgba(0,0,0,0.3)";
+    pdfModelViewer.style.backgroundColor = "transparent"; // Changed from 0.95 white
 
     document.body.appendChild(pdfModelViewer);
     console.log("PDF model viewer added to DOM");
@@ -914,7 +1288,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const maxAttempts = 50;
 
     while (!pdfModelViewer.model && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       attempts++;
       console.log(`Waiting for model to load... attempt ${attempts}`);
     }
@@ -926,10 +1300,28 @@ window.addEventListener("DOMContentLoaded", () => {
 
     console.log("Model loaded successfully");
     console.log("Applying texture and color...");
-    await tryApplyMaterialTexture(pdfModelViewer, materialName, textureDataURL, topMaterialColor);
+    if (tubTextureDataURL) {
+      await tryApplyMaterialTexture(
+        pdfModelViewer,
+        TubMaterialNames,
+        tubTextureDataURL,
+        lidTextureDataURL ? null : topMaterialColor,
+        tubMaterialColor,
+      );
+    }
+    if (lidTextureDataURL) {
+      await tryApplyMaterialTexture(
+        pdfModelViewer,
+        Topmaterialtexture,
+        lidTextureDataURL,
+        null,
+        null,
+      );
+    }
     console.log("Texture and color applied");
 
-    await new Promise((r) => setTimeout(r, 2000));
+    // Increased wait time for UHD 4K rendering and anti-aliasing
+    await new Promise((r) => setTimeout(r, 1500));
     console.log("Ready for capture");
 
     return { pdfModelViewer };
@@ -988,7 +1380,6 @@ window.addEventListener("DOMContentLoaded", () => {
       return idA - idB;
     });
 
-
     console.log("PDF Export started");
     console.log(`Found ${renderedModels.length} selected models to export`);
 
@@ -1023,7 +1414,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const bgImage = new Image();
       bgImage.src = "./assets/pattern/pattern-6.webp";
-      await new Promise((res) => { bgImage.onload = res; });
+      await new Promise((res) => {
+        bgImage.onload = res;
+      });
 
       pdf.addImage(bgImage, "PNG", 0, 0, pageWidth, pageHeight);
 
@@ -1032,8 +1425,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const customLogo = new Image();
       customLogo.src =
-        document.getElementById("customLogoInput")?.dataset.preview ||
-        "./assets/Logo/terratechpacks.png";
+        customLogoPreview.dataset.preview || "./assets/Logo/terratechpacks.png";
 
       await Promise.all([
         new Promise((res) => (terraLogo1.onload = res)),
@@ -1052,7 +1444,7 @@ window.addEventListener("DOMContentLoaded", () => {
         centerX - terraWidth / 2,
         currentY1,
         terraWidth,
-        terraHeight
+        terraHeight,
       );
       currentY1 += terraHeight + 40;
 
@@ -1070,7 +1462,7 @@ window.addEventListener("DOMContentLoaded", () => {
         centerX - customWidth / 2,
         currentY1,
         customWidth,
-        customHeight
+        customHeight,
       );
       currentY1 += customHeight + 40;
 
@@ -1081,11 +1473,13 @@ window.addEventListener("DOMContentLoaded", () => {
       const availableWidth = pageWidth - sideMargin * 2;
       const availableHeight = pageHeight - headerHeight - footerHeight;
       const contentCenterX = pageWidth / 2;
-      const contentCenterY = pageHeight / 2;
-      const pdfModelSize = 800;
+      const contentCenterY = headerHeight + availableHeight / 2;
+      const pdfModelSize = 3840; // UHD 4K Resolution
+      const loadingText = loadingOverlay.querySelector("span");
 
       const terraLogo = new Image();
-      terraLogo.src = window.selectedLogoSrc || "./assets/Logo/terratechpacks.png";
+      terraLogo.src =
+        window.selectedLogoSrc || "./assets/Logo/terratechpacks.png";
 
       await Promise.race([
         new Promise((res) => (terraLogo.onload = res)),
@@ -1093,16 +1487,23 @@ window.addEventListener("DOMContentLoaded", () => {
       ]);
 
       for (let i = 0; i < sortedModels.length; i++) {
+        if (loadingText)
+          loadingText.textContent = `Rendering page ${i + 1} of ${sortedModels.length}...`;
         pdf.addPage();
 
         const card = sortedModels[i];
         const modelTitle = card.dataset.title || "Untitled";
-        const textureDataURL = card.dataset.textureDataUrl;
+        const tubTextureDataURL = card.dataset.textureDataUrl;
+        const lidTextureDataURL = card.dataset.lidTextureDataUrl;
         const topMaterialColor = card.dataset.topMaterialColor || "#ffffff";
+        const tubMaterialColor = card.dataset.tubMaterialColor || "#ffffff";
         const backgroundColor = card.dataset.backgroundColor || "#f5d2da";
         const modelSrcForCard = card.dataset.modelSrc;
         const snapshotDataURL = card.dataset.snapshot;
-        const cardLogoSrc = card.dataset.selectedLogo || window.selectedLogoSrc || "./assets/Logo/terratechpacks.png"; // Use card-specific logo
+        const cardLogoSrc =
+          card.dataset.selectedLogo ||
+          window.selectedLogoSrc ||
+          "./assets/Logo/terratechpacks.png"; // Use card-specific logo
 
         console.log(`Card ${i + 1}: ${modelTitle}, Logo: ${cardLogoSrc}`);
 
@@ -1119,7 +1520,9 @@ window.addEventListener("DOMContentLoaded", () => {
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(18);
         pdf.setTextColor(0, 0, 0);
-        pdf.text(`Option - ${card.dataset.id}`, pageWidth / 2, 70, { align: "center" });
+        pdf.text(`Option - ${card.dataset.id}`, pageWidth / 2, 70, {
+          align: "center",
+        });
 
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(24);
@@ -1138,7 +1541,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if (cardLogo.complete && cardLogo.naturalWidth > 0) {
           const logoHeight = 25;
-          const logoWidth = (cardLogo.naturalWidth * logoHeight) / cardLogo.naturalHeight;
+          const logoWidth =
+            (cardLogo.naturalWidth * logoHeight) / cardLogo.naturalHeight;
           const topMargin = 60;
           pdf.addImage(
             cardLogo,
@@ -1146,20 +1550,25 @@ window.addEventListener("DOMContentLoaded", () => {
             pageWidth - logoWidth - 25,
             topMargin,
             logoWidth,
-            logoHeight
+            logoHeight,
           );
         }
 
-        // Use snapshot if available, otherwise capture new image
-        let modelImageData = snapshotDataURL;
+        // ALWAYS capture new high-res image for the PDF, ignore low-res UI snapshot
+        let modelImageData = null;
 
-        if (!modelImageData && textureDataURL) {
+        if (tubTextureDataURL || lidTextureDataURL) {
           try {
+            console.log(`Rendering high-res capture for PDF: ${modelTitle}...`);
             const result = await createPDFModelViewer(
               modelSrcForCard,
-              textureDataURL,
+              tubTextureDataURL,
               topMaterialColor,
-              pdfModelSize
+              pdfModelSize,
+              lidTextureDataURL,
+              card.dataset.cameraOrbit,
+              card.dataset.fieldOfView,
+              tubMaterialColor,
             );
             if (result) {
               const pdfModelViewer = result.pdfModelViewer;
@@ -1170,10 +1579,21 @@ window.addEventListener("DOMContentLoaded", () => {
             }
           } catch (error) {
             console.error("Model capture failed:", error);
+            // Fallback to snapshot only if high-res fails
+            modelImageData = snapshotDataURL;
           }
+        } else {
+          modelImageData = snapshotDataURL;
         }
 
         if (modelImageData) {
+          try {
+            // Trim transparency to make the model look larger
+            modelImageData = await trimTransparency(modelImageData);
+          } catch (e) {
+            console.warn("Trimming failed, using original image", e);
+          }
+
           const img = new Image();
           await new Promise((res, rej) => {
             img.onload = res;
@@ -1186,10 +1606,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
           let finalWidth, finalHeight;
           if (imageAspectRatio > availableAspectRatio) {
-            finalWidth = availableWidth * 0.95;
+            finalWidth = availableWidth * 0.75; // Reduced from 0.98 for better margins
             finalHeight = finalWidth / imageAspectRatio;
           } else {
-            finalHeight = availableHeight * 0.95;
+            finalHeight = availableHeight * 0.75; // Reduced from 0.98 for better margins
             finalWidth = finalHeight * imageAspectRatio;
           }
 
@@ -1201,7 +1621,9 @@ window.addEventListener("DOMContentLoaded", () => {
             imageX,
             imageY,
             finalWidth,
-            finalHeight
+            finalHeight,
+            undefined,
+            "FAST",
           );
         }
 
@@ -1214,7 +1636,7 @@ window.addEventListener("DOMContentLoaded", () => {
           `${pageNumber}/${totalPages}`,
           pageWidth / 2,
           pageHeight - 25,
-          { align: "center" }
+          { align: "center" },
         );
       }
 
@@ -1240,31 +1662,37 @@ window.addEventListener("DOMContentLoaded", () => {
         (availableHeight1 - (cardsCount - 1) * spaceBetween) / cardsCount;
 
       for (let i = 0; i < sortedModels.length; i++) {
-        const textureDataUrl = sortedModels[i].dataset.textureDataUrl;
-        if (!textureDataUrl) continue;
+        const tubUrl = sortedModels[i].dataset.textureDataUrl;
+        const lidUrl = sortedModels[i].dataset.lidTextureDataUrl;
 
-        await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            const aspectRatio = img.width / img.height;
+        const drawTexture = async (url) => {
+          if (!url) return;
+          await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              const aspectRatio = img.width / img.height;
+              let imgWidth = maxImageWidth / (lidUrl ? 2.1 : 1);
+              let imgHeight = imgWidth / aspectRatio;
+              if (imgHeight > maxHeightPerImage) {
+                imgHeight = maxHeightPerImage;
+                imgWidth = imgHeight * aspectRatio;
+              }
+              const imageX = lidUrl
+                ? url === tubUrl
+                  ? pageWidth / 2 - imgWidth - 10
+                  : pageWidth / 2 + 10
+                : (pageWidth - imgWidth) / 2;
+              pdf.addImage(img, "PNG", imageX, currentY, imgWidth, imgHeight);
+              resolve();
+            };
+            img.onerror = reject;
+            img.src = url;
+          });
+        };
 
-            let imgWidth = maxImageWidth;
-            let imgHeight = imgWidth / aspectRatio;
-
-            if (imgHeight > maxHeightPerImage) {
-              imgHeight = maxHeightPerImage;
-              imgWidth = imgHeight * aspectRatio;
-            }
-
-            const imageX = (pageWidth - imgWidth) / 2;
-            pdf.addImage(img, "PNG", imageX, currentY, imgWidth, imgHeight);
-
-            currentY += imgHeight + spaceBetween;
-            resolve();
-          };
-          img.onerror = reject;
-          img.src = textureDataUrl;
-        });
+        if (tubUrl) await drawTexture(tubUrl);
+        if (lidUrl) await drawTexture(lidUrl);
+        currentY += maxHeightPerImage + spaceBetween;
       }
 
       // Footer for summary page
@@ -1276,14 +1704,15 @@ window.addEventListener("DOMContentLoaded", () => {
         `${summaryPageNumber}/${totalPages}`,
         pageWidth / 2,
         pageHeight - 25,
-        { align: "center" }
+        { align: "center" },
       );
 
       // Save PDF
       console.log("Saving PDF...");
-      pdf.save(`Selected_Theme_Mockup_${new Date().toISOString().slice(0, 10)}.pdf`);
+      pdf.save(
+        `Selected_Theme_Mockup_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
       console.log("PDF saved successfully!");
-
     } catch (error) {
       console.error("PDF Export failed:", error);
       alert("PDF Export failed. Check console for details.");
@@ -1292,15 +1721,46 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  renderedImages.addEventListener('wheel', function (e) {
-    if (e.deltaY !== 0) {
-      e.preventDefault();
-      renderedImages.scrollBy({
-        left: e.deltaY,
-        behavior: 'smooth'
-      });
+  renderedImages.addEventListener(
+    "wheel",
+    function (e) {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        renderedImages.scrollBy({
+          left: e.deltaY,
+          behavior: "smooth",
+        });
+      }
+    },
+    { passive: false },
+  );
+
+  // --- Individual Model View Capture (Export as PNG/JPG) ---
+  const downloadModelBtn = document.getElementById("downloadModelBtn");
+  const exportFormat = document.getElementById("exportFormat");
+
+  downloadModelBtn.addEventListener("click", () => {
+    const format = exportFormat.value;
+    const mimeType = format === "png" ? "image/png" : "image/jpeg";
+    const extension = format === "png" ? "png" : "jpg";
+
+    try {
+      // Capture the current frame from model-viewer
+      const dataUrl = mainModelViewer.toDataURL(mimeType);
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `TerraTech_Model_Capture_${new Date().getTime()}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log(`Model successfully exported as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error("Image capture failed:", error);
+      alert("Failed to capture model image. Please try again.");
     }
-  }, { passive: false });
+  });
 
   // Initialize
   checkFormValidity();
@@ -1314,4 +1774,50 @@ window.addEventListener("DOMContentLoaded", () => {
   console.log("• Touch and drag on mobile");
   console.log("• Arrow keys (Left/Right) for precise control");
   console.log("• Press 'R' to reset rotation");
+
+  // --- Custom Modal Helper ---
+  function showCustomModal({
+    title,
+    message,
+    type = "alert",
+    onConfirm = null,
+  }) {
+    const modal = document.getElementById("customModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalMessage = document.getElementById("modalMessage");
+    const confirmBtn = document.getElementById("confirmModalBtn");
+    const cancelBtn = document.getElementById("cancelModalBtn");
+    const closeModal = document.getElementById("closeModal");
+
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modal.style.display = "block";
+
+    if (type === "confirm") {
+      cancelBtn.style.display = "block";
+    } else {
+      cancelBtn.style.display = "none";
+    }
+
+    const close = () => {
+      modal.style.display = "none";
+      // Cleanup event listeners to prevent memory leaks/duplicate calls
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      closeModal.onclick = null;
+    };
+
+    confirmBtn.onclick = () => {
+      close();
+      if (onConfirm) onConfirm();
+    };
+
+    cancelBtn.onclick = close;
+    closeModal.onclick = close;
+
+    // Close on outside click
+    window.onclick = (event) => {
+      if (event.target == modal) close();
+    };
+  }
 });
