@@ -120,25 +120,28 @@
                 align-items: center;
                 justify-content: center;
                 position: relative;
-                padding: 0 1vw;
+                padding: 0 1.5vw;
               "
             >
-              <h3 id="mainModelTitle">120ml Round Container</h3>
-              <div style="position: absolute; right: 1vw; display: flex; align-items: center; gap: 1.2vw;">
-                <div style="display: flex; align-items: center; gap: 0.5vw;">
-                  <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Apply Pattern</span>
-                  <label class="rotate-switch">
-                    <input type="checkbox" id="autoApplyToggle" checked>
-                    <span class="rotate-slider"></span>
-                  </label>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5vw;">
-                  <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Rotate</span>
-                  <label class="rotate-switch">
-                    <input type="checkbox" id="autoRotateToggle" checked>
-                    <span class="rotate-slider"></span>
-                  </label>
-                </div>
+              <!-- Left: Auto Apply Pattern -->
+              <div style="position: absolute; left: 1.5vw; display: flex; align-items: center; gap: 0.5vw;">
+                <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Apply Pattern</span>
+                <label class="rotate-switch">
+                  <input type="checkbox" id="autoApplyToggle" checked>
+                  <span class="rotate-slider"></span>
+                </label>
+              </div>
+
+              <!-- Center: Model Name -->
+              <h3 id="mainModelTitle" style="margin: 0;">120ml Round Container</h3>
+
+              <!-- Right: Auto Rotate -->
+              <div style="position: absolute; right: 1.5vw; display: flex; align-items: center; gap: 0.5vw;">
+                <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Rotate</span>
+                <label class="rotate-switch">
+                  <input type="checkbox" id="autoRotateToggle" checked>
+                  <span class="rotate-slider"></span>
+                </label>
               </div>
             </div>
             <div class="model_view">

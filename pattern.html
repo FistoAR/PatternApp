@@ -39,5 +39,48 @@
         <div class="loading-state">Loading patterns...</div>
       </div>
     </div>
+
+    <!-- Upload Modal -->
+    <div id="upload-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">Upload Pattern</h3>
+          <span class="close-modal" id="close-upload-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div id="upload-instruction" style="font-size: 0.85vw; margin-bottom: 1vw; color: #666;"></div>
+          
+          <div class="upload-slots" id="upload-slots">
+            <!-- Slot 1 -->
+            <div class="upload-slot" id="slot-primary">
+              <label id="label-primary">Pattern (Bottom)</label>
+              <div class="upload-area" id="trigger-primary">
+                <input type="file" id="file-primary" accept="image/*" hidden />
+                <div id="preview-primary" class="preview-container">
+                  <i class="fa-solid fa-cloud-upload-alt"></i>
+                  <p>Click to Upload</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot 2 -->
+            <div class="upload-slot" id="slot-top">
+              <label id="label-top">Pattern (Top)</label>
+              <div class="upload-area" id="trigger-top">
+                <input type="file" id="file-top" accept="image/*" hidden />
+                <div id="preview-top" class="preview-container">
+                  <i class="fa-solid fa-cloud-upload-alt"></i>
+                  <p>Click to Upload</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" id="btn-cancel-upload">Cancel</button>
+          <button class="submit-btn" id="btn-submit-upload">Save Pattern</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

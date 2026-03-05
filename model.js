@@ -179,35 +179,68 @@ const MODEL_CATEGORIES = {
       path: "./assets/Model_with_logo/120ml round with logo.glb",
     },
     {
+      name: "250ml Round Container",
+      path: "./assets/Model_with_logo/250ml round with logo.glb",
+    },
+    {
+      name: "300ml Round Container",
+      path: "./assets/Model_with_logo/300ml round with logo.glb",
+    },
+    {
       name: "500ml Round Container",
       path: "./assets/Model_with_logo/500ml Round  with logo.glb",
     },
+    {
+      name: "750ml Round Container",
+      path: "./assets/Model_with_logo/750ml round with logo.glb",
+    },
+    {
+      name: "1000ml Round Container",
+      path: "./assets/Model_with_logo/1000ml round with logo.glb",
+    },
   ],
-  Square: [
+  "Round Square": [
     {
       name: "500gms/450ml Container",
       path: "./assets/Model_with_logo/450ml cont with logo.glb",
     },
+    {
+      name: "500ml Container",
+      path: "./assets/Model_with_logo/500ml cont with logo.glb",
+    },
   ],
-  "Sweet Boxes": [
+  Rectangle: [
+    {
+      name: "500ml Rectangular Container",
+      path: "./assets/Model_with_logo/500ml Rect with logo.glb",
+    },
+    {
+      name: "600ml Rectangular Container",
+      path: "./assets/Model_with_logo/600ml Rect with logo.glb",
+    },
+    {
+      name: "750ml Rectangular Container",
+      path: "./assets/Model_with_logo/750ml Rect with logo.glb",
+    }
+  ],
+  "Sweet Box": [
     {
       name: "250gms Sweet Box",
       path: "./assets/Model_with_logo/250gms SB with logo.glb",
     },
+    {
+      name: "500gms Sweet Box",
+      path: "./assets/Model_with_logo/500gms SB with logo.glb",
+    },
   ],
-  "TE Sweet Boxes": [
+  "Sweet Box TE": [
     {
       name: "250gms Sweet BoxTE",
       path: "./assets/Model_with_logo/TE 250 sb with logo.glb",
     },
-  ],
-};
-
-const Rectangle_MODEL_CATEGORIES = {
-  Biryani: [
     {
-      name: "500ml Rectangular Container",
-      path: "./assets/Model_with_logo/500ml Rect with logo.glb",
+      name: "500gms Sweet BoxTE",
+      path: "./assets/Model_with_logo/TE 500 sb with logo.glb",
     },
   ],
 };
@@ -219,35 +252,64 @@ const MODEL_CATEGORIES_WITHOUT_LOGO = {
       path: "./assets/Model_without_logo/120ml round without logo.glb",
     },
     {
+      name: "250ml Round Container",
+      path: "./assets/Model_without_logo/250ml round without logo.glb",
+    },
+    {
+      name: "300ml Round Container",
+      path: "./assets/Model_without_logo/300ml round without logo.glb",
+    },
+    {
       name: "500ml Round Container",
       path: "./assets/Model_without_logo/500ml Round  without logo.glb",
     },
+    {
+      name: "750ml Round Container",
+      path: "./assets/Model_without_logo/750ml round without logo.glb",
+    },
+    {
+      name: "1000ml Round Container",
+      path: "./assets/Model_without_logo/1000ml round without logo.glb",
+    },
   ],
-  Square: [
+  "Round Square": [
     {
       name: "500gms/450ml Container",
       path: "./assets/Model_without_logo/450ml cont without logo.glb",
     },
+    {
+      name: "500ml Container",
+      path: "./assets/Model_without_logo/500ml cont without logo.glb",
+    },
   ],
-  "Sweet Boxes": [
+  Rectangle: [
+    {
+      name: "500ml Rectangular Container",
+      path: "./assets/Model_without_logo/500ml Rect without logo.glb",
+    },
+    {
+      name: "750ml Rectangular Container",
+      path: "./assets/Model_without_logo/750ml Rect without logo.glb",
+    }
+  ],
+  "Sweet Box": [
     {
       name: "250gms Sweet Box",
       path: "./assets/Model_without_logo/250gms SB without logo.glb",
     },
+    {
+      name: "500gms Sweet Box",
+      path: "./assets/Model_without_logo/500gms SB without logo.glb",
+    },
   ],
-  "TE Sweet Boxes": [
+  "Sweet Box TE": [
     {
       name: "250gms Sweet BoxTE",
       path: "./assets/Model_without_logo/TE 250 sb without logo.glb",
     },
-  ],
-};
-
-const RECTANGLE_MODEL_CATEGORIES_WITHOUT_LOGO = {
-  Biryani: [
     {
-      name: "500ml Rectangular Container",
-      path: "./assets/Model_without_logo/500ml Rect without logo.glb",
+      name: "500gms Sweet BoxTE",
+      path: "./assets/Model_without_logo/TE 500 sb without logo.glb",
     },
   ],
 };
@@ -299,7 +361,7 @@ async function initModelAccordion() {
   state.modelViewers = [];
   let modelIndex = 0;
 
-  const categories = { ...MODEL_CATEGORIES, ...Rectangle_MODEL_CATEGORIES };
+  const categories = MODEL_CATEGORIES;
 
   Object.entries(categories).forEach(([category, models]) => {
     const li = document.createElement("li");

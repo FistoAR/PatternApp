@@ -255,14 +255,25 @@
 
 /* Table styles (for All view) */
 .table-responsive {
-  width: 100%;
-  overflow-x: auto;
-  background: transparent;
+  height: 73vh;
+  overflow-y: auto;
+  border-radius: 0.8vw;
+  box-shadow: 0 0.4vw 1.2vw rgba(0,0,0,0.05);
+  border: 0.05vw solid #eee;
+  background-color: #fff;
+  /* Hide scrollbar */
+  scrollbar-width: none; 
+  -ms-overflow-style: none;
+}
+
+.table-responsive::-webkit-scrollbar {
+  display: none;
 }
 
 .pattern-table {
   width: 100%;
   border-collapse: collapse;
+  background-color: #fff;
 }
 
 .pattern-table th {
@@ -281,7 +292,7 @@
 }
 
 .pattern-table td {
-  padding: 1vw;
+  padding: 0.8vw;
   font-size: 0.85vw;
   color: #444;
   border-bottom: 0.05vw solid #f1f1f1;
@@ -289,8 +300,8 @@
   vertical-align: middle;
 }
 
-.pattern-table tr:hover {
-  background-color: #f9f9f9;
+.pattern-table tbody tr:hover {
+  background-color: #fcfcfc;
 }
 
 .table-img {
@@ -321,10 +332,14 @@
   border: 0.05vw solid #eee;
   background-color: #f9f9f9;
   box-sizing: border-box;
-  padding: 1.5vw;
+  padding: 1.5vw; /* Padding for Grid View */
   /* Hide scrollbar */
   scrollbar-width: none; 
   -ms-overflow-style: none;
+}
+
+.pattern-grid-container.has-table {
+  padding: 0; /* No padding for Table View */
 }
 
 .pattern-grid-container::-webkit-scrollbar {
@@ -619,4 +634,125 @@
   width: 2vw;
   height: 2vw;
   border-width: 0.2vw;
+}
+
+/* Dual Image Support */
+.pattern-dual-images {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.pattern-dual-images img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border: 0.05vw solid #fff;
+}
+
+.dual-slot {
+  flex: 1;
+  position: relative;
+  display: flex;
+  overflow: hidden;
+}
+
+.dual-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  font-size: 0.5vw;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  text-align: center;
+  padding: 0.1vw 0;
+  font-weight: 700;
+  z-index: 2;
+  text-transform: uppercase;
+}
+
+.table-img-group {
+  display: flex;
+  gap: 0.3vw;
+  justify-content: center;
+}
+
+.table-img-group .table-img {
+  width: 5vw !important;
+  height: 3vw !important;
+}
+
+.table-img-slot {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  border-radius: 0.3vw;
+  width: 5vw;
+  height: 3vw;
+  flex-shrink: 0;
+}
+
+.table-img-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  font-size: 0.4vw;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  text-align: center;
+  padding: 0.05vw 0;
+  font-weight: 700;
+  z-index: 2;
+  text-transform: uppercase;
+}
+
+.pattern-card.dual {
+  border: 0.1vw solid #ffae4b;
+}
+
+/* Upload Modal Extensions */
+#upload-slots {
+  display: flex;
+  gap: 1.5vw;
+}
+
+.upload-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vw;
+}
+
+.upload-slot label {
+  font-size: 0.85vw;
+  font-weight: 600;
+  color: #555;
+}
+
+.preview-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.preview-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.5vw;
+}
+
+.upload-area.has-image {
+  border-style: solid;
+  padding: 0.2vw;
+}
+
+.upload-area.has-image i, 
+.upload-area.has-image p {
+  display: none;
 }

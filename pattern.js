@@ -10,6 +10,7 @@ const API_DELETE_PATTERNS =
 
 let uploadTarget = { category: "", shape: "" };
 let allCategories = []; // Global storage for categories
+let pendingFiles = { primary: null, top: null };
 
 function initPatternPage() {
   const globalFileInput = document.getElementById("global-pattern-file");
@@ -45,80 +46,156 @@ function initPatternPage() {
   // Global Quick Upload Trigger
   window.triggerQuickUpload = function (category, shape, el) {
     uploadTarget = { category, shape, element: el };
-    if (globalFileInput) {
-      globalFileInput.value = ""; // Clear previous
-      globalFileInput.click();
+    openUploadModal(shape, category);
+  };
+}
+
+function openUploadModal(shape, category) {
+  const modal = document.getElementById("upload-modal");
+  const slotPrimary = document.getElementById("slot-primary");
+  const slotTop = document.getElementById("slot-top");
+  const labelPrimary = document.getElementById("label-primary");
+  const labelTop = document.getElementById("label-top");
+  const instruction = document.getElementById("upload-instruction");
+  const title = document.getElementById("modal-title");
+
+  if (!modal) return;
+
+  // Reset modal state
+  pendingFiles = { primary: null, top: null };
+  resetUploadArea("trigger-primary", "preview-primary");
+  resetUploadArea("trigger-top", "preview-top");
+
+  const shapeLower = (shape || "").toLowerCase().replace(/_/g, " ");
+  title.textContent = `Upload Patterns for ${category}`;
+
+  if (shapeLower === "sweet box" || shapeLower === "sweet box te") {
+    slotPrimary.style.display = "flex";
+    slotTop.style.display = "flex";
+    labelPrimary.textContent = "Bottom Pattern";
+    labelTop.textContent = "Top Pattern";
+    instruction.textContent = "This shape requires two patterns.";
+  } else if (shapeLower === "rectangle") {
+    slotPrimary.style.display = "none";
+    slotTop.style.display = "flex";
+    labelTop.textContent = "Top Pattern";
+    instruction.textContent = "This shape uses only a top pattern.";
+  } else {
+    // Round, Round Square, etc.
+    slotPrimary.style.display = "flex";
+    slotTop.style.display = "none";
+    labelPrimary.textContent = "Bottom Pattern";
+    instruction.textContent = "This shape uses only a bottom pattern.";
+  }
+
+  modal.style.display = "flex";
+
+  // Setup listeners
+  document.getElementById("close-upload-modal").onclick = () =>
+    (modal.style.display = "none");
+  document.getElementById("btn-cancel-upload").onclick = () =>
+    (modal.style.display = "none");
+  document.getElementById("btn-submit-upload").onclick = handleModalSubmit;
+
+  setupUploadSlot(
+    "trigger-primary",
+    "file-primary",
+    "preview-primary",
+    "primary",
+  );
+  setupUploadSlot("trigger-top", "file-top", "preview-top", "top");
+}
+
+function setupUploadSlot(triggerId, inputId, previewId, key) {
+  const trigger = document.getElementById(triggerId);
+  const input = document.getElementById(inputId);
+  if (!trigger || !input) return;
+
+  trigger.onclick = () => input.click();
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      pendingFiles[key] = file;
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        const previewEl = document.getElementById(previewId);
+        previewEl.innerHTML = `<img src="${re.target.result}" style="width:100%; height:100%; object-fit:contain;" />`;
+        trigger.classList.add("has-image");
+      };
+      reader.readAsDataURL(file);
     }
   };
+}
 
-  // Handle file selection and immediate upload
-  if (globalFileInput) {
-    globalFileInput.onchange = async () => {
-      const file = globalFileInput.files[0];
-      if (!file) return;
+function resetUploadArea(triggerId, previewId) {
+  const trigger = document.getElementById(triggerId);
+  const preview = document.getElementById(previewId);
+  if (!trigger || !preview) return;
+  trigger.classList.remove("has-image");
+  preview.innerHTML =
+    '<i class="fa-solid fa-cloud-upload-alt"></i><p>Click to Upload</p>';
+}
 
-      const { category, shape, element } = uploadTarget;
-      if (!category || !shape) return;
+async function handleModalSubmit() {
+  const { category, shape } = uploadTarget;
+  const shapeLower = (shape || "").toLowerCase().replace(/_/g, " ");
+  const isDual = shapeLower === "sweet box" || shapeLower === "sweet box te";
+  const modal = document.getElementById("upload-modal");
+  const submitBtn = document.getElementById("btn-submit-upload");
 
-      let originalContent = "";
-      if (element) {
-        originalContent = element.innerHTML;
-        element.classList.add("loading");
-        element.innerHTML = '<span class="spinner solo"></span>';
-      }
+  // Validation
+  if (isDual && (!pendingFiles.primary || !pendingFiles.top)) {
+    return showAlert("Both patterns are required for this shape.", "error");
+  }
+  if (shapeLower === "rectangle" && !pendingFiles.top) {
+    return showAlert("Top pattern is required for Rectangle.", "error");
+  }
+  if (!isDual && shapeLower !== "rectangle" && !pendingFiles.primary) {
+    return showAlert("Pattern is required.", "error");
+  }
 
-      const ext = file.name.split(".").pop().toLowerCase();
-      const allowed = ["jpg", "jpeg", "png", "gif", "webp"];
-      if (!allowed.includes(ext)) {
-        if (element) {
-          element.classList.remove("loading");
-          element.innerHTML = originalContent;
-        }
-        return alert("Invalid file type.");
-      }
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving...";
 
-      const safeCategory = category.replace(/[^a-z0-9_-]/gi, "_");
-      const filename = `${safeCategory}_${Date.now()}.${ext}`;
+  try {
+    let payload = { category_name: category, shape_type: shape };
+    const safeCategory = category.replace(/[^a-z0-9_-]/gi, "_");
 
-      // Show a temporary loading indicator if possible, or just proceed
-      console.log(`Uploading ${filename} to ${category}...`);
+    if (pendingFiles.primary) {
+      const ext = pendingFiles.primary.name.split(".").pop().toLowerCase();
+      const filename = `${safeCategory}_primary_${Date.now()}.${ext}`;
+      const res = await uploadToAssets(pendingFiles.primary, filename);
+      if (!res.success) throw new Error("Primary upload failed");
+      payload.pattern_url = filename;
+    }
 
-      try {
-        const uploadRes = await uploadToAssets(file, filename);
-        if (!uploadRes || !uploadRes.success) {
-          throw new Error("Upload failed.");
-        }
+    if (pendingFiles.top) {
+      const ext = pendingFiles.top.name.split(".").pop().toLowerCase();
+      const filename = `${safeCategory}_top_${Date.now()}.${ext}`;
+      const res = await uploadToAssets(pendingFiles.top, filename);
+      if (!res.success) throw new Error("Top upload failed");
+      payload.pattern_url_top = filename;
+    }
 
-        const res = await fetch(API_UPLOAD_PATTERN, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            category_name: category,
-            shape_type: shape,
-            pattern_url: filename,
-          }),
-        });
-        const result = await res.json();
+    const res = await fetch(API_UPLOAD_PATTERN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json();
 
-        if (result.status === "success") {
-          fetchPatterns(); // Refresh list
-          showAlert("Pattern uploaded successfully!");
-        } else {
-          showAlert("Error: " + (result.message || "Upload failed"), "error");
-          if (element) {
-            element.classList.remove("loading");
-            element.innerHTML = originalContent;
-          }
-        }
-      } catch (err) {
-        console.error("Upload error:", err);
-        showAlert(err.message || "An error occurred during upload.", "error");
-        if (element) {
-          element.classList.remove("loading");
-          element.innerHTML = originalContent;
-        }
-      }
-    };
+    if (result.status === "success") {
+      modal.style.display = "none";
+      fetchPatterns();
+      showAlert("Pattern uploaded successfully!");
+    } else {
+      showAlert(result.message || "Upload failed", "error");
+    }
+  } catch (err) {
+    showAlert(err.message, "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Save Pattern";
   }
 }
 
@@ -159,8 +236,17 @@ function filterAndRenderGrid() {
   const gridContainer = document.getElementById("pattern-grid-container");
   if (!gridContainer) return;
 
-  // Always use the Grid View (Grouped by Category)
-  renderPatternGrid(loadedPatterns, gridContainer);
+  const shapeFilter = document.getElementById("shape-filter");
+  const selectedShape = shapeFilter ? shapeFilter.value : "";
+
+  // Show table view if nothing is filtered, otherwise show grid
+  if (selectedShape === "") {
+    gridContainer.classList.add("has-table");
+    renderPatternTable(loadedPatterns, gridContainer);
+  } else {
+    gridContainer.classList.remove("has-table");
+    renderPatternGrid(loadedPatterns, gridContainer);
+  }
 }
 
 function renderPatternTable(patterns, container) {
@@ -178,11 +264,11 @@ function renderPatternTable(patterns, container) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>S.No.</th>
-        <th>Shape Type</th>
-        <th>Category</th>
-        <th style="width: 20%;">Pattern</th>
-        <th>Action</th>
+        <th>S.NO.</th>
+        <th>SHAPE TYPE</th>
+        <th>CATEGORY NAME</th>
+        <th>PATTERN</th>
+        <th>ACTION</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -191,13 +277,44 @@ function renderPatternTable(patterns, container) {
   const tbody = table.querySelector("tbody");
   patterns.forEach((p, idx) => {
     const fileName = p.pattern_url || "";
-    const imageUrl = `https://terratechpacks.com/App_3D/Patterns/${encodeURIComponent(fileName)}`;
+    const fileNameTop = p.pattern_url_top || "";
+    const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
+
+    let patternDisplay = "";
+    if (fileName && fileNameTop) {
+      patternDisplay = `
+        <div class="table-img-group">
+          <div class="table-img-slot">
+            <img src="${baseUrl}${encodeURIComponent(fileName)}" class="table-img" alt="Bottom" />
+            <span class="table-img-label">Bottom</span>
+          </div>
+          <div class="table-img-slot">
+            <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" class="table-img" alt="Top" />
+            <span class="table-img-label">Top</span>
+          </div>
+        </div>
+      `;
+    } else {
+      const activeFile = fileName || fileNameTop;
+      const labelText = fileName ? "Bottom" : "Top";
+      patternDisplay = activeFile
+        ? `
+        <div class="table-img-group">
+          <div class="table-img-slot">
+            <img src="${baseUrl}${encodeURIComponent(activeFile)}" class="table-img" alt="Pattern" />
+            <span class="table-img-label">${labelText}</span>
+          </div>
+        </div>
+        `
+        : "-";
+    }
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${idx + 1}</td>
-      <td>${escapeHtml(p.shape_type)}</td>
+      <td>${escapeHtml(p.shape_type || "-")}</td>
       <td>${escapeHtml(p.category_name)}</td>
-      <td><img src="${imageUrl}" class="table-img" alt="Pattern" onerror="this.onerror=null;this.src='';"/></td>
+      <td>${patternDisplay}</td>
       <td><i class="fa-solid fa-trash table-trash" data-id="${p.id}"></i></td>
     `;
     tbody.appendChild(tr);
@@ -304,11 +421,22 @@ function renderPatternGrid(patterns, gridContainer) {
     : "category-sections-wrapper";
 
   activeCategories.forEach((cat) => {
-    // Robust matching: trim and case-insensitive
+    // Filter patterns by both category name AND shape type
     const catPatterns = patterns.filter((p) => {
       const pName = (p.category_name || "").trim().toLowerCase();
       const cName = (cat.category || "").trim().toLowerCase();
-      return pName === cName || pName.includes(cName) || cName.includes(pName);
+      // Standardize shape strings for comparison
+      const pShape = (p.shape_type || "")
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, " ");
+      const cShape = (cat.shape_type || "")
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, " ");
+
+      // Match if names match AND (shapes match exactly OR record is old and has no shape_type)
+      return pName === cName && (pShape === cShape || pShape === "");
     });
     const baseUrl = "https://terratechpacks.com/App_3D/";
     const logoUrl = cat.logo_url
@@ -344,19 +472,36 @@ function renderPatternGrid(patterns, gridContainer) {
         </div>
         <!-- List patterns -->
         ${showPatterns
-          .map((p) => {
+          .flatMap((p) => {
             const fileName = p.pattern_url || "";
-            const imageUrl = `https://terratechpacks.com/App_3D/Patterns/${encodeURIComponent(
-              fileName,
-            )}`;
-            return `
-            <div class="pattern-card">
-              <img src="${imageUrl}" alt="Pattern" onerror="this.onerror=null;this.src='';"/>
-              <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
-                <i class="fa-solid fa-times"></i>
-              </button>
-            </div>
-          `;
+            const fileNameTop = p.pattern_url_top || "";
+            const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
+            const cards = [];
+
+            if (fileName) {
+              cards.push(`
+                <div class="pattern-card">
+                  <img src="${baseUrl}${encodeURIComponent(fileName)}" alt="Pattern" onerror="this.src='';"/>
+                  <span class="dual-label bottom">Bottom Pattern</span>
+                  <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
+                    <i class="fa-solid fa-times"></i>
+                  </button>
+                </div>
+              `);
+            }
+
+            if (fileNameTop) {
+              cards.push(`
+                <div class="pattern-card">
+                  <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" alt="Pattern" onerror="this.src='';"/>
+                  <span class="dual-label top">Top Pattern</span>
+                  <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
+                    <i class="fa-solid fa-times"></i>
+                  </button>
+                </div>
+              `);
+            }
+            return cards;
           })
           .join("")}
         ${
