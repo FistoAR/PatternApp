@@ -131,7 +131,7 @@
 }
 
 .modal-body {
-  padding: 1.5vw 2.5vw;
+  padding: 1.5vw 2.5vw 0.5vw 2.5vw;
 }
 
 .form-group {
@@ -218,8 +218,8 @@
   display: flex;
   justify-content: center;
   gap: 1.5vw;
-  margin-top: 1.5vw;
-  margin-bottom: 0.5vw;
+  margin-top: 1vw;
+  margin-bottom: 2vw;
 }
 
 .cancel-btn {
@@ -253,75 +253,6 @@
   background-color: #b07732;
 }
 
-/* Table styles (for All view) */
-.table-responsive {
-  height: 73vh;
-  overflow-y: auto;
-  border-radius: 0.8vw;
-  box-shadow: 0 0.4vw 1.2vw rgba(0,0,0,0.05);
-  border: 0.05vw solid #eee;
-  background-color: #fff;
-  /* Hide scrollbar */
-  scrollbar-width: none; 
-  -ms-overflow-style: none;
-}
-
-.table-responsive::-webkit-scrollbar {
-  display: none;
-}
-
-.pattern-table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: #fff;
-}
-
-.pattern-table th {
-  position: sticky;
-  top: 0;
-  background: #fdfdfd;
-  font-size: 0.9vw;
-  font-weight: 700;
-  color: #333;
-  text-transform: uppercase;
-  letter-spacing: 0.05vw;
-  padding: 1.2vw 1vw;
-  border-bottom: 0.2vw solid #f1f1f1;
-  text-align: center;
-  z-index: 10;
-}
-
-.pattern-table td {
-  padding: 0.8vw;
-  font-size: 0.85vw;
-  color: #444;
-  border-bottom: 0.05vw solid #f1f1f1;
-  text-align: center;
-  vertical-align: middle;
-}
-
-.pattern-table tbody tr:hover {
-  background-color: #fcfcfc;
-}
-
-.table-img {
-  height: 3vw;
-  width: 5vw;
-  border-radius: 0.3vw;
-  object-fit: cover;
-  border: 0.05vw solid #eee;
-}
-
-.table-trash {
-  cursor: pointer;
-  color: #ff4d4d;
-  font-size: 1vw;
-  transition: transform 0.2s;
-}
-
-.table-trash:hover {
-  transform: scale(1.2);
-}
 
 /* Patterns Grid styles */
 .pattern-grid-container {
@@ -756,3 +687,119 @@
 .upload-area.has-image p {
   display: none;
 }
+/* Shape Selection Grid Styles */
+.shape-selection-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13vw, 1fr));
+  gap: 1.5vw;
+  padding: 0.5vw;
+}
+
+.shape-type-big-card {
+  background: #fff;
+  border-radius: 1vw;
+  border: 0.1vw solid #eee;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0.3vw 1vw rgba(0,0,0,0.03);
+}
+
+.shape-type-big-card:hover {
+  transform: translateY(-0.3vw);
+  box-shadow: 0 0.8vw 2vw rgba(0,0,0,0.08);
+  border-color: #FDAB48;
+}
+
+.shape-icon-container {
+  width: 100%;
+  aspect-ratio: 1.4 / 1;
+  background-color: #f1f1f1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.shape-symbol-placeholder {
+  width: 6vw;
+  height: 6vw;
+  background-color: #d9d9d9;
+  border-radius: 0.8vw;
+  opacity: 0.8;
+}
+
+.shape-card-footer {
+  padding: 0.8vw 1.2vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+}
+
+.shape-card-footer h3 {
+  margin: 0;
+  font-size: 0.95vw;
+  font-weight: 700;
+  color: #333;
+}
+
+/* Back Navigation Button Styles */
+.grid-header-actions {
+  position: sticky;
+  top: -1.5vw; /* Match container padding to stay at the very top */
+  margin: -1.5vw -1.5vw 1vw -1.5vw; /* Pull to edges of container */
+  padding: 1vw 1.5vw;
+  background-color: #f9f9f9; /* Same as container background */
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  border-bottom: 0.1vw solid rgba(0,0,0,0.05);
+}
+
+.back-navigation-btn {
+  background: #fff;
+  border: 0.1vw solid #eee;
+  padding: 0.6vw 1.2vw;
+  border-radius: 0.8vw;
+  font-size: 0.9vw;
+  font-weight: 700;
+  color: #ffae4b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.6vw;
+  transition: all 0.2s ease;
+  box-shadow: 0 0.2vw 0.5vw rgba(0,0,0,0.02);
+}
+
+.back-navigation-btn:hover {
+  background: #fdfdfd;
+  border-color: #FDAB48;
+  transform: translateX(-0.2vw);
+  box-shadow: 0 0.4vw 1vw rgba(0,0,0,0.05);
+}
+
+.back-navigation-btn i {
+  font-size: 0.8vw;
+}
+
+.shape-card-footer i {
+  color: #FDAB48;
+  font-size: 1vw;
+  opacity: 0;
+  transform: translateX(-0.5vw);
+  transition: all 0.3s ease;
+}
+
+.shape-type-big-card:hover .shape-card-footer i {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.shape-type-big-card:hover h3 {
+  color: #FDAB48;
+}
+

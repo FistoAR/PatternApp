@@ -235,28 +235,48 @@
       color: var(--dark);
     }
 
+    .input-with-icon {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
     .input-group input {
-      padding: 0.9vw 1.1vw;
+      padding: 0.9vw 3vw 0.9vw 3vw; /* Add padding for icons on both sides */
       border: 0.14vw solid var(--border);
       border-radius: 0.9vw;
       font-size: 1vw;
       transition: all 0.3s ease;
       background: white;
+      width: 100%;
     }
 
-    .input-group input:focus {
-      border-color: var(--primary);
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-    }
-
-    .input-group i {
+    .input-group .input-icon {
       position: absolute;
-      right: 1.1vw;
-      top: 3.5vw;
+      left: 1.1vw;
+      top: 50%;
       color: #94a3b8;
       transform: translateY(-50%);
       font-size: 1.1vw;
+      z-index: 5;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 1.1vw;
+      top: 50%;
+      color: #94a3b8;
+      transform: translateY(-50%);
+      font-size: 1.1vw;
+      cursor: pointer;
+      z-index: 100;
+      background: transparent;
+      padding: 0.5vw;
+      pointer-events: auto; /* Force clickability */
+    }
+
+    .toggle-password:hover {
+      color: var(--primary);
     }
 
     .error-message {
@@ -388,7 +408,7 @@
       right: 0;
       top: 0;
       height: 100%;
-      z-index: 1;
+      z-index: 20; /* Increased to avoid overlap blocking */
       transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
     }
 
@@ -457,8 +477,13 @@
     }
 
     .ghost-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.2);
       transform: translateY(-2px);
+      box-shadow: 0 0.3vw 1vw rgba(0, 0, 0, 0.1);
+    }
+
+    .ghost-btn:active {
+      transform: translateY(0);
     }
 
     /* Active State Switch */
@@ -486,6 +511,7 @@
       font-weight: 700;
       background: linear-gradient(to right, #4f46e5, #7c3aed);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 

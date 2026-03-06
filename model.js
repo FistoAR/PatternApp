@@ -61,16 +61,51 @@ function debounce(fn, wait = 150) {
   };
 }
 
+// Helper: Physically rotate an image and return data URL
+async function rotateImage(url, degrees) {
+  if (degrees === 0) return url;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const radians = (degrees * Math.PI) / 180;
+
+      const absDegrees = Math.abs(degrees);
+      if (absDegrees === 90 || absDegrees === 270) {
+        canvas.width = img.height;
+        canvas.height = img.width;
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(radians);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      resolve(canvas.toDataURL());
+    };
+    img.onerror = () => resolve(url); // fallback to original
+    img.src = url;
+  });
+}
+
 /********** AVAILABLE OPTIONS **********/
 const options = {
   lid: ["White", "Transparency"],
   tub: ["White", "Transparency", "Black"],
 };
 
+/********** MATERIAL NAMES **********/
+const PATTERN_MATERIAL_NAME = ["tub_label"];
+const RECTANGLE_PATTERN_MATERIAL_NAME = ["lid_label"];
+const LOGO_MATERIAL_NAME = "Logo";
+
 /********** PART MATERIAL NAMES **********/
 const PART_MATERIALS = {
-  lid: ["Top", "Top1_1"], // adjust based on console logs
-  tub: ["Bottom1", "Bottom_1"], // can hold multiple names
+  lid: ["lid"], // Synchronized with model names
+  tub: ["tub"],
 };
 
 /********** UPDATE MATERIAL COLOR **********/
@@ -82,10 +117,12 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
   const factors = {
     white: [1, 1, 1, 1],
     black: [0, 0, 0, 1],
-    transparency: [1, 1, 1, 0.3],
+    // High-visibility semi-transparency base
+    transparency: [0.6, 0.6, 0.6, 0.36],
   };
 
-  let factor = factors[color.toLowerCase()];
+  const lowerColor = color.toLowerCase();
+  let factor = factors[lowerColor];
 
   if (!factor && color.startsWith("#")) {
     const r = parseInt(color.slice(1, 3), 16) / 255;
@@ -105,16 +142,44 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
   viewers.forEach((viewer) => {
     const applyToViewer = () => {
       const materialNames = PART_MATERIALS[part] || [];
+      console.log(
+        `[ColorUpdate] Target Part: ${part}, Color: ${color}, Checking materials:`,
+        materialNames,
+      );
+
       materialNames.forEach((name) => {
         const mat = viewer.model?.materials.find((m) => m.name === name);
-        if (!mat) return;
+        if (!mat) {
+          // Silently ignore if material name doesn't exist on this specific model
+          return;
+        }
+
+        console.log(
+          `[ColorUpdate] Found material: ${name} on model: ${viewer.alt}`,
+        );
 
         if (mat.pbrMetallicRoughness.baseColorTexture) {
           mat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
         }
 
         mat.pbrMetallicRoughness.setBaseColorFactor(factor);
-        mat.setAlphaMode(factor[3] < 1 ? "BLEND" : "OPAQUE");
+
+        // Special settings for Premium Transparency
+        if (lowerColor === "transparency") {
+          // emissive #666666 => [0.4, 0.4, 0.4] for consistent visibility
+          mat.setEmissiveFactor([0.4, 0.4, 0.4]);
+          // User requested metallic 1, roughness 0.12 for highly reflective effect
+          mat.pbrMetallicRoughness.setMetallicFactor(1.0);
+          mat.pbrMetallicRoughness.setRoughnessFactor(0.12);
+        } else {
+          // Reset for opaque colors
+          mat.setEmissiveFactor([0, 0, 0]);
+          mat.pbrMetallicRoughness.setMetallicFactor(0.0);
+          mat.pbrMetallicRoughness.setRoughnessFactor(0.9);
+        }
+
+        // Apply transparency mode
+        mat.setAlphaMode(lowerColor === "transparency" ? "BLEND" : "OPAQUE");
         mat.doubleSided = true;
       });
     };
@@ -126,7 +191,7 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
     }
   });
 
-  state.selectedColors[part] = color.toLowerCase();
+  state.selectedColors[part] = lowerColor;
   localStorage.setItem("selectedColors", JSON.stringify(state.selectedColors));
 }
 
@@ -172,6 +237,10 @@ function updatePart(part) {
 
 /********** CONFIG **********/
 const BASE_URL = "https://terratechpacks.com/App_3D/Patterns/";
+const API_FETCH_PATTERNS =
+  "https://terratechpacks.com/App_3D/pattern_fetch.php";
+const API_FETCH_CATEGORIES =
+  "https://terratechpacks.com/App_3D/category_fetch.php";
 const MODEL_CATEGORIES = {
   Round: [
     {
@@ -201,46 +270,50 @@ const MODEL_CATEGORIES = {
   ],
   "Round Square": [
     {
-      name: "500gms/450ml Container",
-      path: "./assets/Model_with_logo/450ml cont with logo.glb",
+      name: "450ml/500gms Container",
+      path: "./assets/Model_with_logo/450ml round_square with logo.glb",
     },
     {
       name: "500ml Container",
-      path: "./assets/Model_with_logo/500ml cont with logo.glb",
+      path: "./assets/Model_with_logo/500ml round_square with logo.glb",
     },
   ],
   Rectangle: [
     {
       name: "500ml Rectangular Container",
-      path: "./assets/Model_with_logo/500ml Rect with logo.glb",
+      path: "./assets/Model_with_logo/500ml Rectangle with logo.glb",
     },
     {
-      name: "600ml Rectangular Container",
-      path: "./assets/Model_with_logo/600ml Rect with logo.glb",
+      name: "650ml Rectangular Container",
+      path: "./assets/Model_with_logo/650ml Rectangle with logo.glb",
     },
     {
       name: "750ml Rectangular Container",
-      path: "./assets/Model_with_logo/750ml Rect with logo.glb",
-    }
+      path: "./assets/Model_with_logo/750ml Rectangle with logo.glb",
+    },
   ],
   "Sweet Box": [
     {
       name: "250gms Sweet Box",
-      path: "./assets/Model_with_logo/250gms SB with logo.glb",
+      path: "./assets/Model_with_logo/250gms Sweet_box with logo.glb",
     },
     {
       name: "500gms Sweet Box",
-      path: "./assets/Model_with_logo/500gms SB with logo.glb",
+      path: "./assets/Model_with_logo/500gms Sweet_box with logo.glb",
+    },
+    {
+      name: "1kg Sweet Box",
+      path: "./assets/Model_with_logo/1kg Sweet_box with logo.glb",
     },
   ],
   "Sweet Box TE": [
     {
       name: "250gms Sweet BoxTE",
-      path: "./assets/Model_with_logo/TE 250 sb with logo.glb",
+      path: "./assets/Model_with_logo/250gms Sweet_box_TE with logo.glb",
     },
     {
       name: "500gms Sweet BoxTE",
-      path: "./assets/Model_with_logo/TE 500 sb with logo.glb",
+      path: "./assets/Model_with_logo/500gms Sweet_box_TE with logo.glb",
     },
   ],
 };
@@ -288,9 +361,13 @@ const MODEL_CATEGORIES_WITHOUT_LOGO = {
       path: "./assets/Model_without_logo/500ml Rect without logo.glb",
     },
     {
+      name: "650ml Rectangular Container",
+      path: "./assets/Model_without_logo/650ml Rect without logo.glb",
+    },
+    {
       name: "750ml Rectangular Container",
       path: "./assets/Model_without_logo/750ml Rect without logo.glb",
-    }
+    },
   ],
   "Sweet Box": [
     {
@@ -314,10 +391,6 @@ const MODEL_CATEGORIES_WITHOUT_LOGO = {
   ],
 };
 
-const PATTERN_MATERIAL_NAME = "Bottom";
-const RECTANGLE_PATTERN_MATERIAL_NAME = "Top_1";
-const LOGO_MATERIAL_NAME = "Logo";
-
 /********** STATE **********/
 const state = {
   selectedIndex: 0,
@@ -329,6 +402,9 @@ const state = {
   selectedColors: { lid: "white", tub: "white" }, // track last color
   isWithoutLogoModel: false,
   allPatterns: [],
+  rawPatterns: [],
+  currentShapeFilter: null,
+  currentPatternType: null, // "top" or "bottom"
 };
 
 /********** ELEMENTS **********/
@@ -347,6 +423,20 @@ function resolvePatternUrl(input) {
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
   if (s.startsWith("/")) return location.origin + s;
   return BASE_URL + encodeURIComponent(s);
+}
+
+// Canonical shape mapping for: Round, Round Square, Rectangle, Sweet Box, Sweet Box TE
+function getCanonicalShape(shapeStr) {
+  if (!shapeStr) return "";
+  const s = shapeStr.trim().toLowerCase();
+
+  if (s.includes("round square")) return "Round Square";
+  if (s.includes("round")) return "Round";
+  if (s.includes("sweet box te")) return "Sweet Box TE";
+  if (s.includes("sweet box") || s.includes("sb")) return "Sweet Box";
+  if (s.includes("rectangle") || s.includes("rect")) return "Rectangle";
+
+  return shapeStr; // Return original if not special mapped
 }
 
 function delay(ms) {
@@ -401,7 +491,12 @@ async function initModelAccordion() {
       card.appendChild(label);
       content.appendChild(card);
 
-      state.thumbnails.push({ card, name: model.name, path: model.path });
+      state.thumbnails.push({
+        card,
+        name: model.name,
+        path: model.path,
+        shape: category,
+      });
       state.modelViewers.push(mv);
 
       card.addEventListener("click", (e) => {
@@ -462,6 +557,111 @@ function markSelectedThumbnail(index) {
   );
 }
 
+// Filter Pattern Accordion based on Shape
+function filterPatternAccordion(shapeFilter) {
+  state.currentShapeFilter = shapeFilter;
+  const accordion = document.getElementById("patternAccordion");
+  if (!accordion) return;
+
+  const items = accordion.querySelectorAll("li");
+  const shapeLower = (shapeFilter || "").trim().toLowerCase();
+
+  items.forEach((li) => {
+    const swatches = li.querySelectorAll(".pattern-swatch");
+    const headers = li.querySelectorAll(".pattern-group-header");
+    let hasMatch = false;
+
+    swatches.forEach((sw) => {
+      const swShape = (sw.dataset.shape || "").trim().toLowerCase();
+      const swType = (sw.dataset.patternType || "").trim().toLowerCase();
+
+      // Basic visibility based on shape
+      let isVisible = !shapeFilter || swShape === shapeLower;
+
+      // Shape-specific type filtering
+      if (isVisible && shapeFilter) {
+        if (shapeLower === "rectangle" && swType === "bottom") {
+          isVisible = false;
+        } else if (
+          (shapeLower === "round" || shapeLower === "round square") &&
+          swType === "top"
+        ) {
+          isVisible = false;
+        } else if (shapeLower.includes("sweet box")) {
+          // Only show 'full' group for Sweet Boxes
+          if (swType !== "full") isVisible = false;
+        } else {
+          // Hide 'full' for single-label models
+          if (swType === "full") isVisible = false;
+        }
+      }
+
+      sw.style.display = isVisible ? "block" : "none";
+      if (isVisible) hasMatch = true;
+    });
+
+    // Handle Headers visibility
+    headers.forEach((header) => {
+      const type = header.dataset.type;
+      let typeVisible = false;
+      const swatchesOfType = li.querySelectorAll(
+        `.pattern-swatch[data-pattern-type="${type}"]`,
+      );
+      swatchesOfType.forEach((sw) => {
+        if (sw.style.display !== "none") typeVisible = true;
+      });
+      header.style.display = typeVisible ? "block" : "none";
+    });
+
+    // Hide the entire category if no patterns match the shape
+    if (!shapeFilter) {
+      li.style.display = "block";
+    } else {
+      li.style.display = hasMatch ? "block" : "none";
+    }
+
+    // If active category is now empty or hidden, close it
+    if (
+      li.classList.contains("active") &&
+      (!hasMatch || li.style.display === "none")
+    ) {
+      li.classList.remove("active");
+      const header = li.querySelector(".accordion-header");
+      const content = li.querySelector(".accordion-content");
+      if (header) header.classList.remove("active");
+      if (content) content.style.maxHeight = "0px";
+      const drop = li.querySelector(".drop");
+      if (drop) drop.className = "fa-solid fa-angle-down drop";
+    }
+
+    // Refresh maxHeight if open
+    if (li.classList.contains("active")) {
+      const content = li.querySelector(".accordion-content");
+      if (content) content.style.maxHeight = content.scrollHeight + "px";
+    }
+  });
+
+  // ✅ STRICT FILTERING for auto-cycle pool: Include both lid and tub URLs
+  const pool = [];
+  state.rawPatterns.forEach((p) => {
+    const pShape = (p.shape_type || "").trim().toLowerCase();
+    if (!shapeFilter || pShape === shapeLower) {
+      const u1 = resolvePatternUrl(p.pattern_url);
+      const u2 = resolvePatternUrl(p.pattern_url_top);
+      if (u1) pool.push(u1);
+      if (u2) pool.push(u2);
+    }
+  });
+
+  state.allPatterns = [...new Set(pool)];
+
+  // If auto-apply is on, restart the cycle with new pool
+  const autoApplyToggle = document.getElementById("autoApplyToggle");
+  if (autoApplyToggle && autoApplyToggle.checked) {
+    startPatternCycle(state.allPatterns, 2000);
+  }
+}
+
 /********** MODEL SELECTION **********/
 async function selectModel(index) {
   if (index < 0 || index >= state.thumbnails.length) return;
@@ -474,13 +674,57 @@ async function selectModel(index) {
   mainViewer.alt = selectedModel.name;
   mainModelTitle.textContent = selectedModel.name;
 
+  // 🛑 STOP any running pattern cycle immediately to prevent it from setting state.patternUrl
+  stopPatternCycle(false);
+
+  // 🧹 CLEAN SLATE: Reset state when switching models to prevent texture "bleeding"
+  state.patternUrl = null;
+  state.logoDataUrl = null;
+
+  // Clear selection highlight in sidebar
+  document
+    .querySelectorAll(".pattern-swatch")
+    .forEach((sw) => sw.classList.remove("selected"));
+
+  // Update Select Pattern list - "Analyse" the model to find the correct pattern shape
+  let shapeFilter = selectedModel.shape; // default from category
+  const lowerName = selectedModel.name.toLowerCase();
+  const lowerCat = selectedModel.shape.toLowerCase().trim();
+
+  if (lowerCat === "round") {
+    shapeFilter = "Round";
+  } else if (lowerCat === "round square") {
+    shapeFilter = "Round Square";
+  } else if (lowerCat === "rectangle") {
+    shapeFilter = "Rectangle";
+  } else if (lowerCat === "sweet box") {
+    shapeFilter = "Sweet Box";
+  } else if (lowerCat === "sweet box te") {
+    shapeFilter = "Sweet Box TE";
+  }
+
+  console.log(
+    `[Analyse] Model: ${selectedModel.name}, Category: ${selectedModel.shape} => Shape Filter: ${shapeFilter}`,
+  );
+  filterPatternAccordion(shapeFilter);
+
   mainViewer.addEventListener(
     "load",
     async () => {
+      const capturedIndex = index; // Protect against stale loads
       try {
         // ✅ Wait for model to be available after 'load' fires
         while (!mainViewer.model) {
           await new Promise((r) => requestAnimationFrame(r));
+        }
+
+        // 🛑 If user selected a DIFFERENT model while this was loading, ABORT
+        if (state.selectedIndex !== capturedIndex) {
+          console.warn(
+            "[Stale Load] Aborting application for older model index:",
+            capturedIndex,
+          );
+          return;
         }
 
         // Apply current auto-rotate state smoothly
@@ -490,25 +734,75 @@ async function selectModel(index) {
         }
 
         console.log("Model fully available:", selectedModel.name);
-        console.log("logoDataUrl exists?", state.logoDataUrl ? true : false);
 
-        // Material detection
-        const isRect = isRectangleModel(selectedModel.name);
+        // 🧹 RESET ALL MATERIALS on the new model first
+        const viewers = [mainViewer];
+        const materialsToClear = [
+          "Bottom",
+          "Top",
+          "Top_1",
+          "Logo",
+          "lid_label",
+          "tub_label",
+        ];
+        viewers.forEach((v) => {
+          materialsToClear.forEach((matName) => {
+            clearMaterialTexture(v, matName);
+          });
+        });
+
+        // Material detection - prefer shape-based check
+        const curShape = getCanonicalShape(selectedModel.shape);
+        const isRect =
+          isRectangleModel(selectedModel.name) || curShape === "Rectangle";
         const materialName = isRect
           ? RECTANGLE_PATTERN_MATERIAL_NAME
           : PATTERN_MATERIAL_NAME;
 
         state.patternMaterialOverride = materialName;
 
+        // Only apply if user hasn't switched to another model (redundant check for safety)
+        if (state.selectedIndex !== capturedIndex) return;
+
+        // Auto-Apply logic: Ensure we have a compatible pattern for the new shape
+        if (
+          !state.patternUrl ||
+          (isRect && state.currentPatternType !== "top") ||
+          (!isRect && state.currentPatternType !== "bottom")
+        ) {
+          // Current pattern is missing or incompatible. Try to find the first compatible one.
+          const compatible = state.rawPatterns.find((p) => {
+            const pShape = getCanonicalShape(p.shape_type);
+            return pShape === curShape;
+          });
+
+          if (compatible) {
+            const url = isRect
+              ? compatible.pattern_url_top
+              : compatible.pattern_url;
+            if (url) {
+              state.patternUrl = resolvePatternUrl(url);
+              state.currentPatternType = isRect ? "top" : "bottom";
+            }
+          }
+        }
+
         if (state.patternUrl) {
           await applyPatternToAll(state.patternUrl, {
             forceReload: true,
             materialOverride: materialName,
           });
+
+          // Update swatch selection
+          document.querySelectorAll(".pattern-swatch").forEach((el) => {
+            el.classList.toggle(
+              "selected",
+              el.dataset.patternUrl?.split("?")[0] === state.patternUrl,
+            );
+          });
         }
 
         if (state.logoDataUrl) {
-          const viewers = [mainViewer];
           console.log(
             "Available materials on mainViewer:",
             mainViewer.model?.materials?.map((m) => m.name),
@@ -553,57 +847,47 @@ async function fetchCategories() {
   }
 }
 
-// Fetch Patterns by Category with categoryName as a parameter
-async function fetchPatternsByCategory(categoryName) {
-  if (!categoryName) return [];
-
+// Fetch all patterns (replacement for fetchPatternsByCategory)
+async function fetchAllPatterns() {
   try {
-    const formData = new FormData();
-    formData.append("category_name", categoryName);
-    const res = await fetch(
-      "https://terratechpacks.com/App_3D/pattern_url.php",
-      { method: "POST", body: formData },
-    );
+    const res = await fetch(API_FETCH_PATTERNS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category_name: "" }),
+    });
     const json = await res.json();
-    // Check if data is valid and return the patterns that match the selected category
-    if (json.status === "success" && Array.isArray(json.data)) {
-      return json.data.filter(
-        (p) => p.category_name.toLowerCase() === categoryName.toLowerCase(),
-      );
-    }
-    return [];
+    return json.status === "success" && Array.isArray(json.data)
+      ? json.data
+      : [];
   } catch (err) {
-    console.error(
-      `Failed to fetch patterns for category: ${categoryName}`,
-      err,
-    );
+    console.error("Failed to fetch all patterns:", err);
     return [];
   }
 }
 
-// Initialize Category Accordion with lazy loading
+// Initialize Category Accordion with full pattern data
 async function initCategoryAccordion() {
   const accordion = document.getElementById("patternAccordion");
   if (!accordion) return;
 
+  accordion.innerHTML = "";
   const categories = await fetchCategories();
-  let allPatterns = [];
+  const allPatternsData = await fetchAllPatterns();
+  state.rawPatterns = allPatternsData;
 
   const baseurl = "https://terratechpacks.com/App_3D/";
+  const finalUrls = [];
 
-  for (const cat of categories) {
-    const patterns = await fetchPatternsByCategory(cat.category);
-    patterns.forEach((p) => {
-      const patternUrl = resolvePatternUrl(p.pattern_url);
-      allPatterns.push(patternUrl);
-    });
+  categories.forEach((cat) => {
+    const catPatterns = allPatternsData.filter(
+      (p) => p.category_name.toLowerCase() === cat.category.toLowerCase(),
+    );
 
     const li = document.createElement("li");
+    li.dataset.categoryName = cat.category;
 
     const header = document.createElement("div");
     header.className = "accordion-header";
-
-    // Fix logo image source and style
     header.innerHTML = `
       <span>
         <img src="${baseurl + cat.logo_url}" style="height:1.2vw;width:1.2vw;"/> ${cat.category}
@@ -617,11 +901,132 @@ async function initCategoryAccordion() {
     content.style.overflow = "hidden";
     content.style.transition = "max-height 0.3s ease";
 
+    // Build swatches grouped by type
+    if (catPatterns.length) {
+      const lidGroup = document.createElement("div");
+      lidGroup.className = "pattern-group";
+      const lidHeader = document.createElement("div");
+      lidHeader.className = "pattern-group-header";
+      lidHeader.textContent = "Lid Pattern";
+      lidHeader.dataset.type = "top";
+      lidGroup.appendChild(lidHeader);
+
+      const tubGroup = document.createElement("div");
+      tubGroup.className = "pattern-group";
+      const tubHeader = document.createElement("div");
+      tubHeader.className = "pattern-group-header";
+      tubHeader.textContent = "Tub Pattern";
+      tubHeader.dataset.type = "bottom";
+      tubGroup.appendChild(tubHeader);
+
+      const fullGroup = document.createElement("div");
+      fullGroup.className = "pattern-group";
+      const fullHeader = document.createElement("div");
+      fullHeader.className = "pattern-group-header";
+      fullHeader.textContent = "Full Pattern";
+      fullHeader.dataset.type = "full";
+      fullGroup.appendChild(fullHeader);
+
+      catPatterns.forEach((p) => {
+        const canonicalShape = getCanonicalShape(p.shape_type);
+        const isSweetBoxPattern = canonicalShape
+          .toLowerCase()
+          .includes("sweet box");
+
+        if (isSweetBoxPattern) {
+          // ONE swatch for BOTH lid and tub
+          const urlBottom = resolvePatternUrl(p.pattern_url);
+          const urlTop = resolvePatternUrl(p.pattern_url_top);
+          if (urlBottom) finalUrls.push(urlBottom);
+          if (urlTop) finalUrls.push(urlTop);
+
+          const sw = document.createElement("div");
+          sw.className = "pattern-swatch";
+          // Use top pattern (lid) as the thumbnail
+          sw.style.backgroundImage = `url('${urlTop || urlBottom}')`;
+          sw.title = `${p.category_name} - FULL SET`;
+          sw.dataset.patternUrl = urlBottom;
+          sw.dataset.patternUrlTop = urlTop;
+          sw.dataset.shape = canonicalShape;
+          sw.dataset.patternType = "full";
+
+          sw.addEventListener("click", async () => {
+            stopPatternCycle();
+            if (state.isWithoutLogoModel) {
+              const confirmed = confirm(
+                "Selecting a new pattern will remove your custom logo. Proceed?",
+              );
+              if (!confirmed) return;
+            }
+
+            // Apply both in parallel
+            await applyPatternToAll(urlBottom, {
+              patternUrlTop: urlTop,
+              isFullSet: true,
+            });
+          });
+          fullGroup.appendChild(sw);
+        } else {
+          // Standard split for other shapes
+          const subPatterns = [];
+          if (p.pattern_url) {
+            subPatterns.push({
+              url: resolvePatternUrl(p.pattern_url),
+              type: "bottom",
+            });
+          }
+          if (p.pattern_url_top) {
+            subPatterns.push({
+              url: resolvePatternUrl(p.pattern_url_top),
+              type: "top",
+            });
+          }
+
+          subPatterns.forEach((patObj) => {
+            const url = patObj.url;
+            if (url) finalUrls.push(url);
+
+            const sw = document.createElement("div");
+            sw.className = "pattern-swatch";
+            sw.style.backgroundImage = `url('${url}')`;
+            sw.title = `${p.category_name} - ${patObj.type.toUpperCase()}`;
+            sw.dataset.patternUrl = url;
+            sw.dataset.shape = canonicalShape;
+            sw.dataset.patternType = patObj.type;
+
+            sw.addEventListener("click", async () => {
+              stopPatternCycle();
+              if (state.isWithoutLogoModel) {
+                const confirmed = confirm(
+                  "Selecting a new pattern will remove your custom logo. Proceed?",
+                );
+                if (!confirmed) return;
+              }
+              await applyPatternToAll(url);
+            });
+
+            if (patObj.type === "top") lidGroup.appendChild(sw);
+            else tubGroup.appendChild(sw);
+          });
+        }
+      });
+
+      content.appendChild(lidGroup);
+      content.appendChild(tubGroup);
+      content.appendChild(fullGroup);
+    } else {
+      const msg = document.createElement("div");
+      msg.textContent = "No patterns available";
+      msg.style.padding = "0.6vw";
+      msg.style.fontSize = "0.85vw";
+      content.appendChild(msg);
+    }
+
     li.appendChild(header);
     li.appendChild(content);
     accordion.appendChild(li);
 
-    header.addEventListener("click", async () => {
+    header.addEventListener("click", () => {
       const isOpen = header.classList.contains("active");
 
       accordion.querySelectorAll(".accordion-header").forEach((h) => {
@@ -644,108 +1049,13 @@ async function initCategoryAccordion() {
       } else {
         li.classList.add("active");
         header.classList.add("active");
-
-        if (!content.dataset.loaded) {
-          content.innerHTML = "";
-
-          // Add loading message
-          const loader = document.createElement("div");
-          loader.className = "pattern-loader";
-          loader.textContent = "Loading...";
-          loader.style.fontSize = "0.85vw";
-          content.appendChild(loader);
-
-          if (patterns.length) {
-            let loadedCount = 0;
-
-            patterns.forEach((p, index) => {
-              const patternUrl = resolvePatternUrl(p.pattern_url);
-              const img = new Image();
-              img.src = patternUrl;
-
-              img.onload = () => {
-                const sw = document.createElement("div");
-                sw.className = "pattern-swatch";
-                sw.style.backgroundImage = `url('${patternUrl}')`;
-                sw.title = `${p.category_name} - ${index + 1}`;
-                sw.dataset.patternUrl = patternUrl;
-
-                sw.addEventListener("click", async () => {
-                  console.log("Pattern selected:", sw.dataset.patternUrl);
-                  stopPatternCycle();
-
-                  if (state.isWithoutLogoModel) {
-                    const confirmed = confirm(
-                      "Selecting a new pattern will remove your custom logo. Proceed?",
-                    );
-                    if (!confirmed) return;
-                  }
-
-                  const selectedUrl = sw.dataset.patternUrl?.split("?")[0];
-                  state.patternUrl = selectedUrl;
-
-                  document.querySelectorAll(".pattern-swatch").forEach((el) => {
-                    const elUrl = el.dataset.patternUrl?.split("?")[0];
-                    el.classList.toggle("selected", elUrl === selectedUrl);
-                  });
-
-                  await applyPatternToAll(sw.dataset.patternUrl);
-
-                  if (state.isWithoutLogo) {
-                    state.logoDataUrl = null;
-                  }
-                });
-
-                // Add the swatch before the loader
-                content.insertBefore(sw, loader);
-                checkIfAllLoaded();
-              };
-
-              img.onerror = () => {
-                const sw = document.createElement("div");
-                sw.className = "pattern-swatch error";
-                sw.textContent = "Failed to load";
-                content.insertBefore(sw, loader);
-                checkIfAllLoaded();
-              };
-
-              function checkIfAllLoaded() {
-                loadedCount++;
-                if (loadedCount === patterns.length) {
-                  loader.remove();
-                  content.dataset.loaded = "true";
-                  content.style.maxHeight = content.scrollHeight + "px";
-                  header.querySelector(".drop").className =
-                    "fa-solid fa-angle-up drop";
-                }
-              }
-            });
-
-            // Expand right away
-            content.style.maxHeight = content.scrollHeight + "px";
-            header.querySelector(".drop").className =
-              "fa-solid fa-angle-up drop";
-          } else {
-            content.innerHTML = "";
-            const noPattern = document.createElement("div");
-            noPattern.textContent = "No patterns available for this category";
-            noPattern.style.padding = "0.6vw";
-            noPattern.style.fontSize = "0.85vw";
-            content.appendChild(noPattern);
-            content.dataset.loaded = "true";
-            content.style.maxHeight = content.scrollHeight + "px";
-            header.querySelector(".drop").className =
-              "fa-solid fa-angle-up drop";
-          }
-        } else {
-          content.style.maxHeight = content.scrollHeight + "px";
-          header.querySelector(".drop").className = "fa-solid fa-angle-up drop";
-        }
+        content.style.maxHeight = content.scrollHeight + "px";
+        header.querySelector(".drop").className = "fa-solid fa-angle-up drop";
       }
     });
-  }
+  });
 
-  return allPatterns;
+  return [...new Set(finalUrls)];
 }
 
 // ================== EXPORT ==================
@@ -789,28 +1099,142 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
   let lastSelectedEl = null;
 
   state.patternCycleTimer = setInterval(() => {
-    const patternUrl = patternUrls[idx % patternUrls.length];
+    // ✅ Re-check toggle state: if it was turned off, abort this interval run
+    const toggle = document.getElementById("autoApplyToggle");
+    if (!toggle || !toggle.checked) {
+      stopPatternCycle(false);
+      return;
+    }
+
+    // ✅ Always use the LATEST filtered pool from state, not the captured patternUrls
+    const pool =
+      state.allPatterns && state.allPatterns.length > 0
+        ? state.allPatterns
+        : patternUrls;
+    const patternUrl = pool[idx % pool.length];
+
     if (!patternUrl) {
       idx++;
       return;
     }
 
-    // apply to all viewers in parallel (skip wait)
-    const viewers = Array.from(
+    // apply to relevant viewers in parallel (skip wait)
+    const allViewers = Array.from(
       new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
     );
-    viewers.forEach((viewer) => {
-      if (!viewer.model) return;
-      const modelName = (viewer.alt || "").toLowerCase();
-      const materialName = isRectangleModel(modelName)
-        ? RECTANGLE_PATTERN_MATERIAL_NAME
-        : PATTERN_MATERIAL_NAME;
-      tryApplyMaterialTexture(viewer, materialName, patternUrl, {
-        skipWait: true,
-      }).catch(() => {});
+
+    allViewers.forEach((viewer) => {
+      if (!viewer || !viewer.model) return;
+
+      // Check if this viewer should receive the pattern
+      let shouldApply = viewer === mainViewer;
+      if (!shouldApply && state.modelViewers && state.thumbnails) {
+        const idxv = state.modelViewers.indexOf(viewer);
+        const thumb = state.thumbnails[idxv];
+        if (
+          thumb &&
+          getCanonicalShape(thumb.shape) === state.currentShapeFilter
+        ) {
+          shouldApply = true;
+        }
+      }
+
+      const modelAlt = (viewer.alt || "").toLowerCase();
+      // Improved Box detection
+      const isBox =
+        modelAlt.includes("sweet box") ||
+        modelAlt.includes("sweetbox") ||
+        modelAlt.includes("sb") ||
+        modelAlt.includes("square");
+
+      // For cycle, we don't know the type, so we try to find the swatch design's intended type
+      let typeFromSwatch = null;
+      const cleanUrl = patternUrl.split("?")[0];
+      const sw = Array.from(document.querySelectorAll(".pattern-swatch")).find(
+        (el) => el.dataset.patternUrl?.split("?")[0] === cleanUrl,
+      );
+      if (sw) typeFromSwatch = sw.dataset.patternType;
+
+      let targets = [];
+      if (isBox) {
+        const isTE = modelAlt.includes("te");
+        if (typeFromSwatch === "top")
+          targets = isTE
+            ? PATTERN_MATERIAL_NAME
+            : RECTANGLE_PATTERN_MATERIAL_NAME;
+        else if (typeFromSwatch === "bottom")
+          targets = isTE
+            ? RECTANGLE_PATTERN_MATERIAL_NAME
+            : PATTERN_MATERIAL_NAME;
+        else
+          targets = [
+            ...RECTANGLE_PATTERN_MATERIAL_NAME,
+            ...PATTERN_MATERIAL_NAME,
+          ];
+      } else {
+        targets = isRectangleModel(modelAlt)
+          ? RECTANGLE_PATTERN_MATERIAL_NAME
+          : PATTERN_MATERIAL_NAME;
+      }
+
+      if (shouldApply) {
+        const isTE = modelAlt.includes("te");
+
+        const applyOne = async (pUrl, pType) => {
+          if (!pUrl) return;
+          let matNames = [];
+          if (isBox) {
+            if (pType === "top")
+              matNames = isTE
+                ? PATTERN_MATERIAL_NAME
+                : RECTANGLE_PATTERN_MATERIAL_NAME;
+            else if (pType === "bottom")
+              matNames = isTE
+                ? RECTANGLE_PATTERN_MATERIAL_NAME
+                : PATTERN_MATERIAL_NAME;
+          } else {
+            matNames = isRectangleModel(modelAlt)
+              ? RECTANGLE_PATTERN_MATERIAL_NAME
+              : PATTERN_MATERIAL_NAME;
+          }
+
+          let rot = 0;
+          const isLidMat = RECTANGLE_PATTERN_MATERIAL_NAME.some((n) =>
+            matNames.includes(n),
+          );
+          if (isBox && isTE && isLidMat) {
+            rot = 90;
+          }
+
+          tryApplyMaterialTexture(viewer, matNames, pUrl, {
+            skipWait: true,
+            rotation: rot,
+          }).catch(() => {});
+        };
+
+        // Determine if this is a grouped swatch
+        const sw = Array.from(
+          document.querySelectorAll(".pattern-swatch"),
+        ).find(
+          (el) =>
+            el.dataset.patternUrl?.split("?")[0] === patternUrl.split("?")[0],
+        );
+
+        if (sw && sw.dataset.patternType === "full") {
+          applyOne(patternUrl, "bottom");
+          applyOne(sw.dataset.patternUrlTop, "top");
+        } else {
+          const type =
+            sw?.dataset.patternType ||
+            (isRectangleModel(modelAlt) ? "top" : "bottom");
+          applyOne(patternUrl, type);
+        }
+      } else {
+        targets.forEach((matName) => clearMaterialTexture(viewer, matName));
+      }
     });
 
-    // efficient swatch update: only touch the previously selected and the new one
+    // Efficient swatch update
     const cleanUrl = patternUrl.split("?")[0];
     let matched = null;
     document.querySelectorAll(".pattern-swatch").forEach((sw) => {
@@ -845,7 +1269,14 @@ function stopPatternCycle(syncToggle = true) {
 function isRectangleModel(name) {
   if (!name) return false;
   const lower = name.trim().toLowerCase();
-  const keywords = ["rect", "rectangular", "biryani"];
+  // These categories are "rectangular" because they use the Lid/Top material logic
+  const keywords = [
+    "rectangle",
+    "rect",
+    "rectangular",
+    "sweet box",
+    "sweet box te",
+  ];
   const result = keywords.some((k) => lower.includes(k));
   console.log(
     `[isRectangleModel] "${name}" => ${result ? "✅ RECT" : "❌ ROUND"}`,
@@ -853,10 +1284,32 @@ function isRectangleModel(name) {
   return result;
 }
 
+// Utility: Clear texture from a material
+function clearMaterialTexture(viewer, materialName) {
+  if (!viewer || !viewer.model) return;
+  const names = Array.isArray(materialName) ? materialName : [materialName];
+
+  names.forEach((n) => {
+    const material = viewer.model.materials.find((m) => m.name === n);
+    if (
+      material &&
+      material.pbrMetallicRoughness &&
+      material.pbrMetallicRoughness.baseColorTexture
+    ) {
+      material.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+    }
+  });
+}
+
 /********** APPLY PATTERN TO ALL VIEWERS **********/
 async function applyPatternToAll(
   patternUrl,
-  { forceReload = false, materialOverride = null } = {},
+  {
+    forceReload = false,
+    materialOverride = null,
+    patternUrlTop = null,
+    isFullSet = false,
+  } = {},
 ) {
   if (!patternUrl) return;
 
@@ -869,36 +1322,130 @@ async function applyPatternToAll(
     sw.classList.toggle("selected", swatchUrl === cleanSelectedUrl);
   });
 
-  const viewers = Array.from(
+  const allViewers = Array.from(
     new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
   );
 
   await Promise.all(
-    viewers.map(async (viewer) => {
+    allViewers.map(async (viewer, i) => {
+      if (!viewer) return;
       if (!viewer.model) {
         await new Promise((resolve) =>
           viewer.addEventListener("load", resolve, { once: true }),
         );
       }
 
-      // Always decide material: use override if provided, else detect rectangle
-      let materialName = materialOverride;
-      if (!materialName) {
-        materialName = isRectangleModel(viewer.alt || "")
+      // 1. Determine if this viewer should receive the pattern
+      let shouldApply = viewer === mainViewer;
+
+      // If it's a thumbnail viewer, check its shape
+      if (!shouldApply && state.modelViewers && state.thumbnails) {
+        // Find logical index (excluding mainViewer if it's also in state.modelViewers)
+        const idxInList = state.modelViewers.indexOf(viewer);
+        const thumb = state.thumbnails[idxInList];
+        if (
+          thumb &&
+          getCanonicalShape(thumb.shape) === state.currentShapeFilter
+        ) {
+          shouldApply = true;
+        }
+      }
+
+      // 2. Determine material name(s) dynamically for this model
+      const modelAlt = (viewer.alt || "").toLowerCase();
+      const isBox =
+        modelAlt.includes("sweet box") ||
+        modelAlt.includes("sweetbox") ||
+        modelAlt.includes("square");
+
+      let targets = [];
+      if (isBox) {
+        const isTE = modelAlt.includes("te");
+        // Dual-label models: target the SPECIFIC label based on pattern type
+        if (state.currentPatternType === "top") {
+          targets = isTE
+            ? PATTERN_MATERIAL_NAME
+            : RECTANGLE_PATTERN_MATERIAL_NAME;
+        } else if (state.currentPatternType === "bottom") {
+          targets = isTE
+            ? RECTANGLE_PATTERN_MATERIAL_NAME
+            : PATTERN_MATERIAL_NAME;
+        } else {
+          // If type unknown, try to find either (first match wins in tryApplyMaterialTexture)
+          targets = [
+            ...RECTANGLE_PATTERN_MATERIAL_NAME,
+            ...PATTERN_MATERIAL_NAME,
+          ];
+        }
+      } else {
+        // Single-label models: target their default label regardless of pattern "type"
+        // This ensures a "Top" pattern can still be applied to a "Round" model's tub_label.
+        targets = isRectangleModel(modelAlt)
           ? RECTANGLE_PATTERN_MATERIAL_NAME
           : PATTERN_MATERIAL_NAME;
       }
 
-      // Clear old texture before applying new
-      const mat = viewer.model?.materials.find((m) => m.name === materialName);
-      if (mat?.pbrMetallicRoughness.baseColorTexture) {
-        mat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
-      }
+      if (shouldApply) {
+        // Apply pattern(s)
+        const applyOne = async (pUrl, pType) => {
+          if (!pUrl) return;
+          const isTE = modelAlt.includes("te");
+          let matNames = [];
 
-      await tryApplyMaterialTexture(viewer, materialName, patternUrl, {
-        skipWait: true,
-        forceReload,
-      });
+          if (isBox) {
+            if (pType === "top")
+              matNames = isTE
+                ? PATTERN_MATERIAL_NAME
+                : RECTANGLE_PATTERN_MATERIAL_NAME;
+            else if (pType === "bottom")
+              matNames = isTE
+                ? RECTANGLE_PATTERN_MATERIAL_NAME
+                : PATTERN_MATERIAL_NAME;
+          } else {
+            matNames = isRectangleModel(modelAlt)
+              ? RECTANGLE_PATTERN_MATERIAL_NAME
+              : PATTERN_MATERIAL_NAME;
+          }
+
+          // Fix orientation for Sweet Box TE lid_label
+          let finalRotation = 0;
+          const isLidMat = RECTANGLE_PATTERN_MATERIAL_NAME.some((n) =>
+            matNames.includes(n),
+          );
+
+          if (isBox && isTE && isLidMat) {
+            finalRotation = 90;
+          }
+
+          await tryApplyMaterialTexture(viewer, matNames, pUrl, {
+            skipWait: true,
+            forceReload,
+            rotation: finalRotation,
+          });
+        };
+
+        if (isFullSet && patternUrlTop) {
+          // Both together
+          await Promise.all([
+            applyOne(patternUrl, "bottom"),
+            applyOne(patternUrlTop, "top"),
+          ]);
+        } else {
+          // Single application (determined by type attribute of swatch if available)
+          const swatch = Array.from(
+            document.querySelectorAll(".pattern-swatch"),
+          ).find((s) => s.dataset.patternUrl === patternUrl);
+          const type =
+            swatch?.dataset.patternType ||
+            (isRectangleModel(modelAlt) ? "top" : "bottom");
+          await applyOne(patternUrl, type);
+        }
+      } else {
+        // Clear pattern if model is incompatible
+        for (const matName of targets) {
+          clearMaterialTexture(viewer, matName);
+        }
+      }
     }),
   );
 }
@@ -947,75 +1494,74 @@ async function tryApplyMaterialTexture(
   viewer,
   materialNames,
   textureUrl,
-  { skipWait = false, forceReload = false } = {},
+  { skipWait = false, forceReload = false, rotation = 0, offset = [0, 0] } = {},
 ) {
   if (!viewer || !textureUrl) return;
 
-  // Wait for model to load if necessary
   if (!viewer.model && !skipWait) {
     await new Promise((res) =>
       viewer.addEventListener("load", res, { once: true }),
     );
   }
 
-  // Normalize material names to an array
   const names = Array.isArray(materialNames) ? materialNames : [materialNames];
+  const matchingMaterials = (viewer.model?.materials || []).filter((m) =>
+    names.includes(m.name),
+  );
 
-  // Find the first matching material on the viewer
-  const mat = names
-    .map((n) => viewer.model?.materials?.find((m) => m.name === n))
-    .find(Boolean);
-
-  if (!mat) {
-    console.warn(`Materials [${names.join(", ")}] not found on viewer`);
-    return;
-  }
-
-  // Normalize URLs to avoid repeated application
-  const currentUri =
-    mat.pbrMetallicRoughness.baseColorTexture?.texture?.source?.uri;
-  const normalizedCurrent = currentUri ? stripQuery(currentUri) : null;
-  const normalizedNew = stripQuery(textureUrl);
-
-  if (normalizedCurrent === normalizedNew && !forceReload) {
-    return; // Texture already applied
-  }
+  if (matchingMaterials.length === 0) return;
 
   try {
-    // Initialize per-viewer cache
     let vcache = viewerTextureCache.get(viewer);
     if (!vcache) {
       vcache = new Map();
       viewerTextureCache.set(viewer, vcache);
     }
 
-    const cacheKey = mat.name + "::" + normalizedNew;
+    const normalizedNew = stripQuery(textureUrl);
+    const cacheKey = `${normalizedNew}_rot${rotation}`;
     let tex;
 
     if (!forceReload && vcache.has(cacheKey)) {
-      tex = vcache.get(cacheKey); // Use cached texture
+      tex = vcache.get(cacheKey);
     } else {
-      tex = await viewer.createTexture(encodeURI(textureUrl)); // Load new texture
+      // Physically rotate the image if needed before creating texture
+      const finalUrl =
+        rotation !== 0 ? await rotateImage(textureUrl, rotation) : textureUrl;
+      tex = await viewer.createTexture(finalUrl);
       vcache.set(cacheKey, tex);
     }
 
-    // Apply texture
-    mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
+    matchingMaterials.forEach((mat) => {
+      // Normalize URLs to avoid repeated application
+      const currentUri =
+        mat.pbrMetallicRoughness.baseColorTexture?.texture?.source?.uri;
+      const normalizedCurrent = currentUri ? stripQuery(currentUri) : null;
 
-    // Ensure proper transform and wrapping
-    if (tex.texture) {
-      tex.texture.transform = { offset: [0, 0], scale: [1, 1], rotation: 0 };
-      if (
-        tex.texture.sampler &&
-        typeof tex.texture.sampler.setWrapMode === "function"
-      ) {
-        tex.texture.sampler.setWrapMode("CLAMP_TO_EDGE");
+      if (normalizedCurrent === normalizedNew && !forceReload) return;
+
+      if (mat.pbrMetallicRoughness.baseColorTexture) {
+        mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
       }
-    }
 
-    // Reset base color to white and opaque
-    mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-    mat.setAlphaMode("BLEND");
+      if (tex.texture) {
+        // We handle rotation physically now, so transform is just identity
+        tex.texture.transform = {
+          offset: [0, 0],
+          scale: [1, 1],
+          rotation: 0,
+        };
+        if (
+          tex.texture.sampler &&
+          typeof tex.texture.sampler.setWrapMode === "function"
+        ) {
+          tex.texture.sampler.setWrapMode("CLAMP_TO_EDGE");
+        }
+      }
+
+      mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+      mat.setAlphaMode("BLEND");
+    });
   } catch (err) {
     console.warn("Failed to apply texture:", err);
   }
@@ -1035,9 +1581,23 @@ if (logoInput) {
     );
 
     await Promise.all(
-      viewers.map((v) =>
-        tryApplyMaterialTexture(v, LOGO_MATERIAL_NAME, state.logoDataUrl),
-      ),
+      viewers.map((v) => {
+        const alt = (v.alt || "").toLowerCase();
+        const isBox =
+          alt.includes("sweet box") ||
+          alt.includes("sweetbox") ||
+          alt.includes("square");
+        const isTE = alt.includes("te");
+        const rotation = isBox && isTE ? 90 : 0;
+        return tryApplyMaterialTexture(
+          v,
+          LOGO_MATERIAL_NAME,
+          state.logoDataUrl,
+          {
+            rotation,
+          },
+        );
+      }),
     );
   });
 }
@@ -1620,6 +2180,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ✅ Wait for thumbnails and categories to load
   await initModelAccordion();
   state.allPatterns = await initCategoryAccordion(); // must return all patterns!
+
+  // ✅ Apply default filter for "Round" since it's opened by default
+  filterPatternAccordion("Round");
 
   if (mainViewer && !state.modelViewers.includes(mainViewer)) {
     state.modelViewers.push(mainViewer);

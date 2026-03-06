@@ -1,6 +1,10 @@
 const API_FETCH = "https://terratechpacks.com/App_3D/category_fetch.php";
 const API_ADD = "https://terratechpacks.com/App_3D/category_add.php";
 const API_REMOVE = "https://terratechpacks.com/App_3D/category_remove.php";
+const CAT_API_FETCH_PATTERNS =
+  "https://terratechpacks.com/App_3D/pattern_fetch.php";
+const CAT_API_DELETE_PATTERNS =
+  "https://terratechpacks.com/App_3D/pattern_remove.php";
 
 function initCategoryPage() {
   fetchCategories();
@@ -199,12 +203,41 @@ async function addCategory() {
   }
 }
 
-// ✅ Remove a category
-async function removeCategory(id) {
+// ✅ Remove a category (and its patterns)
+async function removeCategory(id, categoryName, shapeType) {
   showConfirm(
-    "This will delete all patterns in this category. Continue?",
+    `Deleting "${categoryName}" will also remove all its patterns. Continue?`,
     async () => {
       try {
+        // 1. Fetch all patterns to find matches
+        const pRes = await fetch(CAT_API_FETCH_PATTERNS, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category_name: "" }),
+        });
+        const pData = await pRes.json();
+
+        if (pData.status === "success" && Array.isArray(pData.data)) {
+          // Filter patterns belonging to this category and shape
+          const patternsToDelete = pData.data.filter((p) => {
+            const pCat = (p.category_name || "").trim().toLowerCase();
+            const pShape = (p.shape_type || "").trim().toLowerCase();
+            const cCat = (categoryName || "").trim().toLowerCase();
+            const cShape = (shapeType || "").trim().toLowerCase();
+            return pCat === cCat && (pShape === cShape || pShape === "");
+          });
+
+          // 2. Delete each matching pattern
+          for (const pattern of patternsToDelete) {
+            await fetch(CAT_API_DELETE_PATTERNS, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id: pattern.id }),
+            });
+          }
+        }
+
+        // 3. Finally remove the category
         const response = await fetch(API_REMOVE, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -214,7 +247,7 @@ async function removeCategory(id) {
         const data = await response.json();
 
         if (data.status === "success") {
-          showAlert("Category removed successfully.");
+          showAlert("Category and all associated patterns removed.");
           fetchCategories();
         } else {
           showAlert(
@@ -224,7 +257,7 @@ async function removeCategory(id) {
         }
       } catch (error) {
         console.error("Remove error:", error);
-        showAlert("An error occurred while removing the category.", "error");
+        showAlert("An error occurred during cascading deletion.", "error");
       }
     },
   );
@@ -262,7 +295,7 @@ function renderCategories(categories, errorMessage = "") {
             <td>${escapeHtml(displayName)}</td>
             <td><img src="${baseUrl + logoUrl}" alt="${escapeHtml(displayName)} Logo" width="50" height="50" /></td> <!-- Display logo -->
             <td class="remove">
-                <i class="fa-solid fa-trash trash" onclick="removeCategory(${id})" style="cursor:pointer;color:red;"></i>
+                <i class="fa-solid fa-trash trash" onclick="removeCategory(${id}, '${cat.category}', '${cat.shape_type}')" style="cursor:pointer;color:red;"></i>
             </td>
         `;
     tableBody.appendChild(row);

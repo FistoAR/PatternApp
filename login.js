@@ -26,9 +26,13 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("authActiveTab", "signup");
   }
 
-  // Event Listeners
-  switchToSignupBtn.addEventListener("click", showSignUp);
-  switchToSigninBtn.addEventListener("click", showSignIn);
+  // Event Listeners for switching between forms
+  if (switchToSignupBtn) {
+    switchToSignupBtn.addEventListener("click", showSignUp);
+  }
+  if (switchToSigninBtn) {
+    switchToSigninBtn.addEventListener("click", showSignIn);
+  }
 
   // Initialize based on saved state
   const savedTab = localStorage.getItem("authActiveTab");
@@ -130,16 +134,30 @@ document.addEventListener("DOMContentLoaded", () => {
     errorEl.style.display = "none";
     return true;
   }
-
   function showError(input, message) {
     const errorEl = getErrorMessageElement(input);
     if (errorEl) {
       errorEl.textContent = message;
       errorEl.style.display = "block";
-      errorEl.style.visibility = "visible";
-      errorEl.style.height = "auto";
     }
   }
+
+  // --- Password Toggle Logic ---
+  document.querySelectorAll(".toggle-password").forEach((eye) => {
+    eye.addEventListener("click", function (e) {
+      e.preventDefault();
+      const input = this.parentElement.querySelector("input");
+      if (input.type === "password") {
+        input.type = "text";
+        this.classList.remove("fa-eye");
+        this.classList.add("fa-eye-slash");
+      } else {
+        input.type = "password";
+        this.classList.remove("fa-eye-slash");
+        this.classList.add("fa-eye");
+      }
+    });
+  });
 
   // Sign In Submit
   signInForm.addEventListener("submit", (e) => {
@@ -149,7 +167,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let valid = true;
     const usernameInput = signInForm.querySelector("#signin-name");
     const passInput = signInForm.querySelector("#signin-password");
-    const rememberCheckbox = signInForm.querySelector("#signin-check");
 
     if (!validatePassword(passInput.value.trim())) {
       showCustomAlert(
@@ -157,14 +174,6 @@ document.addEventListener("DOMContentLoaded", () => {
         "Security Rule",
       );
       showError(passInput, "Password must be at least 8 characters.");
-      valid = false;
-    } else if (!rememberCheckbox.checked) {
-      showCustomAlert(
-        "You must check the remember box to proceed.",
-        "Validation Alert",
-      );
-      showError(rememberCheckbox, "Please check the box");
-      rememberCheckbox.closest(".custom-check").classList.add("error");
       valid = false;
     } else if (usernameInput.value.trim() === "") {
       showError(usernameInput, "Please enter your username.");
@@ -175,7 +184,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = {
         username: usernameInput.value.trim(),
         password: passInput.value.trim(),
-        remember: rememberCheckbox.checked,
       };
 
       fetch("https://terratechpacks.com/App_3D/signin_user.php", {

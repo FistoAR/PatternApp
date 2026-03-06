@@ -102,14 +102,14 @@
 
 .sidebar-menu li a {
     text-decoration: none;
-    color: #555;
-    font-size: 0.9vw;
-    font-weight: 500;
-    padding: 0.8vw 1.2vw;
+    color: #4b5563; /* Slightly darker grey for better readability */
+    font-size: 1.1vw; /* Accurate sizing from image */
+    font-weight: 600; /* Bolder font */
+    padding: 0.9vw 1.5vw;
     display: flex;
     align-items: center;
-    gap: 0.8vw;
-    border-radius: 0.4vw;
+    gap: 1.2vw;
+    border-radius: 0.6vw;
     transition: all 0.2s ease;
 }
 
@@ -119,9 +119,16 @@
 }
 
 .sidebar-menu a.active {
-    background-color: #fce8e8;
-    color: #fb3838;
-    font-weight: 600;
+    background-color: #FEF2F2; /* Pure light red background */
+    color: #ef4444; /* Modern red color */
+}
+
+.sidebar-menu a.active i {
+    color: #ef4444;
+}
+
+.sidebar-menu li a p {
+    margin: 0; /* Ensure no p margin breaks alignment */
 }
 
 .sidebar-menu li a i {

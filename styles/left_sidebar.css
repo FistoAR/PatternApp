@@ -55,20 +55,23 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  padding: 0.7vw 1vw;
-  border-radius: 0.4vw;
-  border: 0.05vw solid transparent;
-  transition: all 0.3s;
-  /* border: 1px solid #ccc; */
+  padding: 0.6vw 1vw;
+  border-radius: 0.6vw;
+  border: 0.1vw solid #e0e0e0;
+  background: #ffffff;
+  box-shadow: 0 0.2vw 0.6vw rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .left_side_bar .accordion-header:hover {
-  border: 0.05vw solid #ccc;
-  background: #f9f9f9;
+  border-color: #FDAB48;
+  box-shadow: 0 0.4vw 1.2vw rgba(0, 0, 0, 0.08);
 }
 
 .left_side_bar .accordion-header.active {
-  border: 0.05vw solid #000;
+  border-color: #FDAB48;
 }
 
 .left_side_bar .accordion-header span {
@@ -81,10 +84,8 @@
 
 .left_side_bar .accordion-header i {
   font-style: normal;
-  font-size: 1.1vw;
-  width: 30px;
+  font-size: 1vw;
   color: #323232;
-  /* background-color: red; */
 }
 
 /* Accordion content (collapsed by default) */
@@ -99,8 +100,8 @@
 
 /* Active (expanded) */
 .left_side_bar .accordion-content.active {
-  max-height: 35vw;           /* enough space to show patterns */
-  padding: 0.6vw 10px !important; /* restore vertical padding */
+  max-height: 45vw;           /* enough space to show patterns */
+  padding: 1vw !important; 
   overflow-y: auto;            /* enable scroll if content too tall */
 }
 
@@ -126,20 +127,52 @@
 
 /* Pattern swatches */
 .pattern-swatch {
-  width: 4vw;
-  height: 4vw;
-  border-radius: 0.5vw;
-  margin: 0.3vw;
+  width: 4.2vw;
+  height: 4.2vw;
+  border-radius: 0.6vw;
+  margin: 0.1vw;
   display: inline-block;
   background-size: cover;
   background-position: center;
   cursor: pointer;
   position: relative;
-  border: 0.05vw solid black;
+  border: 0.1vw solid #eee;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.pattern-swatch:hover {
+  transform: scale(1.05);
+  border-color: #FDAB48;
 }
 
 .pattern-swatch.selected {
   border: 0.15vw solid #007bff;
+  box-shadow: 0 0 0.5vw rgba(0, 123, 255, 0.3);
+}
+
+.patternContainer {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5vw !important;
+  width: 100%;
+}
+
+.pattern-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2vw;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.pattern-group-header {
+  font-size: 0.9vw;
+  font-weight: 700;
+  color: #000;
+  margin: 0.8vw 0 0.4vw 0;
+  padding-left: 0.2vw;
+  text-align: left;
+  width: 100%; /* Force header to own line */
 }
 
 
@@ -311,9 +344,10 @@
 
 
 .upload-box {
-  border: 0.15vw dashed #000000;
-  border-radius: 0.8vw;
-  padding: 1vw 5vw;
+  border: 0.1vw dashed #333;
+  border-radius: 0.6vw;
+  padding: 1vw 0;
+  width: 18vw;
   margin-top: 0.6vw;
   display: flex;
   flex-direction: column;
@@ -348,8 +382,8 @@ input[type="file"] {
 .edit_btn{
   border: none;
   margin-top: 0.6vw;
-  height: 2.5vw;
-  width: 100%;
+  height: 2.2vw;
+  width: 18vw;
   border-radius: 0.4vw;
   background-color: #fbd238;
   cursor: pointer;

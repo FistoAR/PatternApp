@@ -72,20 +72,20 @@ function openUploadModal(shape, category) {
   if (shapeLower === "sweet box" || shapeLower === "sweet box te") {
     slotPrimary.style.display = "flex";
     slotTop.style.display = "flex";
-    labelPrimary.textContent = "Bottom Pattern";
-    labelTop.textContent = "Top Pattern";
+    labelPrimary.textContent = "Tub Pattern";
+    labelTop.textContent = "Lid Pattern";
     instruction.textContent = "This shape requires two patterns.";
   } else if (shapeLower === "rectangle") {
     slotPrimary.style.display = "none";
     slotTop.style.display = "flex";
-    labelTop.textContent = "Top Pattern";
-    instruction.textContent = "This shape uses only a top pattern.";
+    labelTop.textContent = "Lid Pattern";
+    instruction.textContent = "This shape uses only a lid pattern.";
   } else {
     // Round, Round Square, etc.
     slotPrimary.style.display = "flex";
     slotTop.style.display = "none";
-    labelPrimary.textContent = "Bottom Pattern";
-    instruction.textContent = "This shape uses only a bottom pattern.";
+    labelPrimary.textContent = "Tub Pattern";
+    instruction.textContent = "This shape uses only a tub pattern.";
   }
 
   modal.style.display = "flex";
@@ -232,6 +232,14 @@ function updateCategoryFilterOptions() {
   }
 }
 
+const SHAPE_TYPES = [
+  { id: "Round", label: "Round" },
+  { id: "Round Square", label: "Round Square" },
+  { id: "Rectangle", label: "Rectangle" },
+  { id: "Sweet Box", label: "Sweet Box" },
+  { id: "Sweet Box TE", label: "Sweet Box TE" },
+];
+
 function filterAndRenderGrid() {
   const gridContainer = document.getElementById("pattern-grid-container");
   if (!gridContainer) return;
@@ -239,99 +247,61 @@ function filterAndRenderGrid() {
   const shapeFilter = document.getElementById("shape-filter");
   const selectedShape = shapeFilter ? shapeFilter.value : "";
 
-  // Show table view if nothing is filtered, otherwise show grid
+  // Remove table view and use shape selection grid if no shape is selected
   if (selectedShape === "") {
-    gridContainer.classList.add("has-table");
-    renderPatternTable(loadedPatterns, gridContainer);
+    gridContainer.classList.remove("has-table");
+    renderShapeSelectionGrid(gridContainer);
   } else {
     gridContainer.classList.remove("has-table");
     renderPatternGrid(loadedPatterns, gridContainer);
   }
 }
 
-function renderPatternTable(patterns, container) {
+function renderShapeSelectionGrid(container) {
   container.innerHTML = "";
-  if (!patterns.length) {
-    container.innerHTML = `<div class="loading-state">No patterns found.</div>`;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "shape-selection-wrapper";
+
+  // Filter SHAPE_TYPES to only show those that exist in allCategories
+  const availableShapes = SHAPE_TYPES.filter((st) =>
+    allCategories.some(
+      (cat) =>
+        (cat.shape_type || "").trim().toLowerCase() ===
+        st.id.trim().toLowerCase(),
+    ),
+  );
+
+  if (availableShapes.length === 0) {
+    container.innerHTML = `<div class="loading-state">No shapes available.</div>`;
     return;
   }
 
-  const tableWrapper = document.createElement("div");
-  tableWrapper.className = "table-responsive";
-
-  const table = document.createElement("table");
-  table.className = "pattern-table";
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>S.NO.</th>
-        <th>SHAPE TYPE</th>
-        <th>CATEGORY NAME</th>
-        <th>PATTERN</th>
-        <th>ACTION</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  `;
-
-  const tbody = table.querySelector("tbody");
-  patterns.forEach((p, idx) => {
-    const fileName = p.pattern_url || "";
-    const fileNameTop = p.pattern_url_top || "";
-    const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
-
-    let patternDisplay = "";
-    if (fileName && fileNameTop) {
-      patternDisplay = `
-        <div class="table-img-group">
-          <div class="table-img-slot">
-            <img src="${baseUrl}${encodeURIComponent(fileName)}" class="table-img" alt="Bottom" />
-            <span class="table-img-label">Bottom</span>
-          </div>
-          <div class="table-img-slot">
-            <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" class="table-img" alt="Top" />
-            <span class="table-img-label">Top</span>
-          </div>
-        </div>
-      `;
-    } else {
-      const activeFile = fileName || fileNameTop;
-      const labelText = fileName ? "Bottom" : "Top";
-      patternDisplay = activeFile
-        ? `
-        <div class="table-img-group">
-          <div class="table-img-slot">
-            <img src="${baseUrl}${encodeURIComponent(activeFile)}" class="table-img" alt="Pattern" />
-            <span class="table-img-label">${labelText}</span>
-          </div>
-        </div>
-        `
-        : "-";
-    }
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${idx + 1}</td>
-      <td>${escapeHtml(p.shape_type || "-")}</td>
-      <td>${escapeHtml(p.category_name)}</td>
-      <td>${patternDisplay}</td>
-      <td><i class="fa-solid fa-trash table-trash" data-id="${p.id}"></i></td>
+  availableShapes.forEach((shape) => {
+    const card = document.createElement("div");
+    card.className = "shape-type-big-card";
+    card.innerHTML = `
+      <div class="shape-icon-container">
+        <!-- We can use a generic icon or a placeholder as per user request -->
+        <div class="shape-symbol-placeholder"></div>
+      </div>
+      <div class="shape-card-footer">
+        <h3>${shape.label}</h3>
+        <i class="fa-solid fa-chevron-right"></i>
+      </div>
     `;
-    tbody.appendChild(tr);
-  });
-
-  tableWrapper.appendChild(table);
-  container.appendChild(tableWrapper);
-
-  // Attach delete events
-  tableWrapper.querySelectorAll(".table-trash").forEach((btn) => {
-    btn.onclick = () => {
-      const id = btn.getAttribute("data-id");
-      if (confirm("Are you sure you want to delete this pattern?")) {
-        deletePattern(id);
+    card.onclick = () => {
+      const shapeFilter = document.getElementById("shape-filter");
+      if (shapeFilter) {
+        shapeFilter.value = shape.id;
+        updateCategoryFilterOptions();
+        filterAndRenderGrid();
       }
     };
+    wrapper.appendChild(card);
   });
+
+  container.appendChild(wrapper);
 }
 
 async function fetchPatternCategories() {
@@ -407,9 +377,47 @@ function renderPatternGrid(patterns, gridContainer) {
     return true;
   });
 
-  // Show all active categories based on selection (include empty categories for easy upload)
-  if (activeCategories.length === 0) {
-    gridContainer.innerHTML = `<div class="loading-state">No categories available. Use filters to upload to new categories.</div>`;
+  // Check if any patterns exist for the selected shape
+  const hasPatternsForShape = patterns.some((p) => {
+    const pShape = (p.shape_type || "").trim().toLowerCase().replace(/_/g, " ");
+    const sShape = (selectedShape || "")
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, " ");
+    return pShape === sShape || pShape === "";
+  });
+
+  // Add Back Button if filters are active
+  if (selectedShape !== "") {
+    const headerActions = document.createElement("div");
+    headerActions.className = "grid-header-actions";
+
+    const isBigView = selectedShape !== "" && selectedCategory !== "";
+    const backBtn = document.createElement("button");
+    backBtn.className = "back-navigation-btn";
+    const backText = isBigView ? "Back to Categories" : "Back to All Shapes";
+    backBtn.innerHTML = `<i class="fa-solid fa-arrow-left"></i> ${backText}`;
+
+    backBtn.onclick = () => {
+      if (selectedCategory) {
+        if (categoryFilter) categoryFilter.value = "";
+      } else {
+        if (shapeFilter) shapeFilter.value = "";
+      }
+      updateCategoryFilterOptions();
+      filterAndRenderGrid();
+    };
+
+    headerActions.appendChild(backBtn);
+    gridContainer.appendChild(headerActions);
+  }
+
+  // Show "No Pattern available" if no patterns or categories match
+  if (activeCategories.length === 0 && !hasPatternsForShape) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "loading-state";
+    emptyState.textContent = `No Pattern available for ${selectedShape || "this selection"}.`;
+    gridContainer.appendChild(emptyState);
     return;
   }
 
@@ -478,11 +486,11 @@ function renderPatternGrid(patterns, gridContainer) {
             const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
             const cards = [];
 
-            if (fileName) {
+            if (fileNameTop) {
               cards.push(`
                 <div class="pattern-card">
-                  <img src="${baseUrl}${encodeURIComponent(fileName)}" alt="Pattern" onerror="this.src='';"/>
-                  <span class="dual-label bottom">Bottom Pattern</span>
+                  <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" alt="Pattern" onerror="this.src='';"/>
+                  <span class="dual-label top">Lid Pattern</span>
                   <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
                     <i class="fa-solid fa-times"></i>
                   </button>
@@ -490,11 +498,11 @@ function renderPatternGrid(patterns, gridContainer) {
               `);
             }
 
-            if (fileNameTop) {
+            if (fileName) {
               cards.push(`
                 <div class="pattern-card">
-                  <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" alt="Pattern" onerror="this.src='';"/>
-                  <span class="dual-label top">Top Pattern</span>
+                  <img src="${baseUrl}${encodeURIComponent(fileName)}" alt="Pattern" onerror="this.src='';"/>
+                  <span class="dual-label bottom">Tub Pattern</span>
                   <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
                     <i class="fa-solid fa-times"></i>
                   </button>
