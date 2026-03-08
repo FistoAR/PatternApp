@@ -40,8 +40,9 @@
         <div class="model_view" id="modelview">
           <model-viewer id="modelViewer" src="./assets/Model_Export/500ml Round A-1 .glb" camera-controls=""
             exposure="1" shadow-intensity="0.5" disable-tap="" disable-pan="" ar="" interaction-prompt="none"
-            min-field-of-view="14deg" max-field-of-view="20deg" ar-status="not-presenting"
-            camera-orbit="0deg 75deg 0.7649m">
+            field-of-view="20deg" min-field-of-view="auto" max-field-of-view="auto" 
+            min-camera-orbit="auto auto 0.35m" max-camera-orbit="auto auto 0.45m"
+            ar-status="not-presenting" camera-orbit="0deg 75deg 0.45m">
           </model-viewer>
 
           <div class="model-view-controls">
@@ -58,12 +59,12 @@
 
           <div class="model-view-left-controls">
             <label class="checkbox-label glass-control">
-              <input type="checkbox" id="tubTransparent" />
-              <span>Tub Transparensy</span>
+              <input type="checkbox" id="lidTransparent" />
+              <span>Lid Transparency</span>
             </label>
             <label class="checkbox-label glass-control">
-              <input type="checkbox" id="lidTransparent" />
-              <span>Lid Transparensy</span>
+              <input type="checkbox" id="tubTransparent" />
+              <span>Tub Transparency</span>
             </label>
           </div>
         </div>
@@ -112,14 +113,6 @@
               <input type="text" id="textureTitle" placeholder="Enter Theme Name" />
 
               <div class="input-row" id="textureUploadRow" style="margin-bottom: 0.5vw;">
-                <div class="input-group" id="tubTextureGroup" style="flex: 1;">
-                  <label for="textureFile" id="textureLabel">Upload Texture <span style="color: red;">*</span></label>
-                  <div class="file-upload-wrapper">
-                    <input type="file" name="texture" id="textureFile" accept="image/*" style="display: none;" />
-                    <label for="textureFile" class="file-upload">Tub File</label>
-                    <span id="fileName">No file chosen</span>
-                  </div>
-                </div>
                 <div class="input-group" id="lidTextureGroup" style="flex: 1; display: none;">
                   <label for="lidTextureFile">Lid Texture <span style="color: red;">*</span></label>
                   <div class="file-upload-wrapper">
@@ -128,17 +121,18 @@
                     <span id="lidFileName">No file chosen</span>
                   </div>
                 </div>
+                <div class="input-group" id="tubTextureGroup" style="flex: 1;">
+                  <label for="textureFile" id="textureLabel">Upload Texture <span style="color: red;">*</span></label>
+                  <div class="file-upload-wrapper">
+                    <input type="file" name="texture" id="textureFile" accept="image/*" style="display: none;" />
+                    <label for="textureFile" class="file-upload">Tub File</label>
+                    <span id="fileName">No file chosen</span>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div class="input-row">
-              <div class="color-control">
-                <label>Tub Color</label>
-                <div class="color-picker-wrapper">
-                  <input type="color" id="tubColor" value="#ffffff" />
-                  <img id="tubColorImg" src="./assets/pngwing.png" title="Choose Tub Color" />
-                </div>
-              </div>
               <div class="color-control">
                 <label>Lid Color</label>
                 <div class="color-picker-wrapper">
@@ -147,15 +141,21 @@
                 </div>
               </div>
               <div class="color-control">
+                <label>Tub Color</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="tubColor" value="#ffffff" />
+                  <img id="tubColorImg" src="./assets/pngwing.png" title="Choose Tub Color" />
+                </div>
+              </div>
+              <div class="color-control">
                 <label>BG Color</label>
                 <div class="color-picker-wrapper">
-                  <input type="color" id="bgColor" value="#ffffff" />
+                  <input type="color" id="bgColor" value="#c7c7c7" />
                   <img id="bgColorImg" src="./assets/pngwing.png" title="Choose Background Color" />
                 </div>
               </div>
             </div>
 
-            </div>
           </div>
         </div>
 
@@ -171,9 +171,17 @@
                 <button id="clearAllBtn" title="Clear all rendered models">
                   <i class="fa-solid fa-trash-can"></i> Clear All
                 </button>
-              </div>
+              </div> <!-- Close render-controls -->
+            </div> <!-- Close rendered-header -->
+            <div class="render_container">
+              <button id="scrollLeftBtn" class="scroll-btn left" title="Scroll Left">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <div id="renderedImages"></div>
+              <button id="scrollRightBtn" class="scroll-btn right" title="Scroll Right">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
             </div>
-            <div id="renderedImages"></div>
           </div>
         </div>
       </div>

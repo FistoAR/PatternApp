@@ -12,6 +12,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const customLogoInput = document.getElementById("customLogoInput");
   const customLogoPreview = document.getElementById("customLogoPreview");
   const clearAllBtn = document.getElementById("clearAllBtn");
+  const scrollLeftBtn = document.getElementById("scrollLeftBtn");
+  const scrollRightBtn = document.getElementById("scrollRightBtn");
 
   // Transparency Checkboxes
   const tubTransparent = document.getElementById("tubTransparent");
@@ -20,6 +22,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Dual Texture Upload Elements
   const lidTextureFile = document.getElementById("lidTextureFile");
   const lidFileName = document.getElementById("lidFileName");
+  const fileName = document.getElementById("fileName");
   const tubTextureGroup = document.getElementById("tubTextureGroup");
   const lidTextureGroup = document.getElementById("lidTextureGroup");
   const textureLabel = document.getElementById("textureLabel");
@@ -35,11 +38,31 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Horizontal Scroll Button Listeners
+  if (scrollLeftBtn && scrollRightBtn && renderedImages) {
+    scrollLeftBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      renderedImages.scrollLeft -= 120;
+    });
+
+    scrollRightBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      renderedImages.scrollLeft += 120;
+    });
+
+    renderedImages.addEventListener("scroll", updateScrollButtons, {
+      passive: true,
+    });
+    window.addEventListener("resize", updateScrollButtons);
+  }
+
   const modelSrc = "./assets/model.glb";
-  const materialName = "Bottom.006";
-  const TubMaterialNames = ["Bottom", "Bottom.006"];
-  const TopmaterialName = ["top Material", "Top.006"];
-  const Topmaterialtexture = "top Material";
+  const TubColorMaterials = ["tub", "Tub", "bottom"];
+  const LidColorMaterials = ["lid", "Lid", "top"];
+  const TubTextureMaterials = ["tub_label", "bottom_label"];
+  const LidTextureMaterials = ["lid_label", "top_label"];
   const viewerTextureCache = new WeakMap();
   let renderedModels = [];
   let cardCounter = 1;
@@ -50,20 +73,75 @@ window.addEventListener("DOMContentLoaded", () => {
   let isScrolling = false;
   let scrollTimeout;
 
-  // Zoom levels - only 2 steps
-  const zoomLevels = [0.7649, 0.55]; // [normal, slightly zoomed in]
+  // --- Shape-Specific Camera Configs ---
+  // Zoom levels - updated dynamically in updateMainViewer
+  let zoomLevels = [0.45, 0.35];
   let currentZoomIndex = 0;
-  let currentZoom = 0.7649; // Initialize with default zoom
+  let currentZoom = 0.45;
   let originalBottomTexture = null;
+  let currentTubTextureDataURL = null;
+  let currentLidTextureDataURL = null;
+  let lidColorManualSet = false;
+  let tubColorManualSet = false;
+  const originalMaterialsCache = new Map(); // Store original material properties for reset
+
+  async function syncViewerState(viewer) {
+    if (!viewer || !viewer.model) return;
+
+    // Sync pickers with model defaults on first load (if not manually set)
+    const firstLid = viewer.model.materials.find((m) =>
+      LidColorMaterials.includes(m.name),
+    );
+    const firstTub = viewer.model.materials.find((m) =>
+      TubColorMaterials.includes(m.name),
+    );
+
+    if (firstLid && !lidColorManualSet) {
+      const c = firstLid.pbrMetallicRoughness.baseColorFactor;
+      topColor.value = rgbToHex(c[0], c[1], c[2]);
+    }
+    if (firstTub && !tubColorManualSet) {
+      const c = firstTub.pbrMetallicRoughness.baseColorFactor;
+      tubColor.value = rgbToHex(c[0], c[1], c[2]);
+    }
+
+    // 1. Apply Lid State
+    updatePartTransparency(
+      viewer,
+      "lid",
+      lidTransparent.checked,
+      lidColorManualSet ? topColor.value : null,
+    );
+
+    // 2. Apply Tub State
+    updatePartTransparency(
+      viewer,
+      "tub",
+      tubTransparent.checked,
+      tubColorManualSet ? tubColor.value : null,
+    );
+
+    // 3. Apply Tub Texture (if any)
+    if (currentTubTextureDataURL) {
+      await tryApplyMaterialTexture(
+        viewer,
+        TubTextureMaterials,
+        currentTubTextureDataURL,
+      );
+    }
+
+    // 4. Apply Lid Texture (if any)
+    if (currentLidTextureDataURL) {
+      await tryApplyMaterialTexture(
+        viewer,
+        LidTextureMaterials,
+        currentLidTextureDataURL,
+      );
+    }
+  }
 
   modelViewer.addEventListener("load", () => {
-    const bottomMat = modelViewer.model?.materials?.find(
-      (m) => m.name === materialName,
-    );
-    if (bottomMat) {
-      originalBottomTexture =
-        bottomMat.pbrMetallicRoughness.baseColorTexture?.texture || null;
-    }
+    syncViewerState(modelViewer);
   });
 
   // --- Scroll to rotate functionality ---
@@ -78,8 +156,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const zoomDelta = event.deltaY * zoomSensitivity;
 
     // Define min and max zoom
-    const minDistance = 0.55; // max zoom in
-    const maxDistance = 0.7649; // max zoom out (base)
+    const minDistance = 0.35; // max zoom in
+    const maxDistance = 0.45; // Lock zoom out at a tighter perspective to keep model large
 
     // Update zoom distance
     currentZoom += zoomDelta;
@@ -107,7 +185,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // modelViewer.addEventListener("wheel", handleScroll, { passive: false });
-  renderedImages.addEventListener("wheel", handleScroll, { passive: false });
+  // renderedImages.addEventListener("wheel", handleScroll, { passive: false });
 
   // // Touch/drag support for mobile
   // let isDragging = false;
@@ -177,6 +255,20 @@ window.addEventListener("DOMContentLoaded", () => {
   // });
 
   // --- Utilities ---
+  function truncateFileName(name) {
+    if (!name) return "No file chosen";
+    const lastDotIndex = name.lastIndexOf(".");
+    if (lastDotIndex === -1) {
+      return name.length > 7 ? name.substring(0, 7) + "...." : name;
+    }
+    const extension = name.substring(lastDotIndex + 1);
+    const fileNameWithoutExtension = name.substring(0, lastDotIndex);
+    if (fileNameWithoutExtension.length > 7) {
+      return fileNameWithoutExtension.substring(0, 7) + "...." + extension;
+    }
+    return name;
+  }
+
   function stripQuery(url) {
     try {
       return (
@@ -201,71 +293,75 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function hexToRgbArray(hex) {
     const rgb = hexToRgb(hex);
-    return rgb ? [rgb.r, rgb.g, rgb.b] : [245, 210, 218];
+    return rgb ? [rgb.r, rgb.g, rgb.b] : [1, 1, 1];
+  }
+
+  function rgbToHex(r, g, b) {
+    const toHex = (c) => {
+      const hex = Math.round(c * 255).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    };
+    return "#" + toHex(r) + toHex(g) + toHex(b);
   }
 
   // --- Enhanced texture and color application ---
-  async function tryApplyMaterialTexture(
+ async function tryApplyMaterialTexture(
     viewer,
     materialNames,
     textureUrl,
     topMaterialColor = null,
     tubMaterialColor = null,
   ) {
+    console.log(`Checking model viewer before`);
     if (!viewer || !textureUrl) return;
+    console.log(`Checking model viewer after`);
     if (!viewer.model) {
       await new Promise((res) =>
         viewer.addEventListener("load", res, { once: true }),
       );
     }
-
+ 
     const names = Array.isArray(materialNames)
       ? materialNames
       : [materialNames];
-
+ 
+    console.log(`Names: ${names}`);
     // Process main materials (typically for textures)
     const targetMaterials =
-      viewer.model?.materials?.filter((m) => names.includes(m.name)) || [];
-
+      viewer.model?.materials?.filter(m =>
+  names.some(n => m.name.toLowerCase().includes(n.toLowerCase()))
+) || [];
+ 
+    console.log(`Target materials: ${targetMaterials}`);
+ 
     for (const mat of targetMaterials) {
+      console.log(`Mat: ${JSON.stringify(mat, 2, null)}`);
       try {
         let vcache = viewerTextureCache.get(viewer) || new Map();
         viewerTextureCache.set(viewer, vcache);
-
+ 
         const cacheKey = mat.name + "::" + stripQuery(textureUrl);
         let tex =
           vcache.get(cacheKey) ||
           (await viewer.createTexture(encodeURI(textureUrl)));
         vcache.set(cacheKey, tex);
-
-        mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
-
-        if (tubMaterialColor) {
-          const colorArray = hexToRgbArray(tubMaterialColor);
-          mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
-        } else {
+ 
+        if (mat.pbrMetallicRoughness.baseColorTexture) {
+          mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
+          // Always reset color factor to white for stickers/labels to ensure original texture color
           mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+          console.info('Applied texture to: ' + mat);
+        } else {
+          console.warn(
+            `Material ${mat.name} does not have a baseColorTexture slot and no tint fallback provided.`,
+          );
         }
-
-        // mat.setAlphaMode("OPAQUE"); // Removed as transparency is now managed by updatePartTransparency
       } catch (err) {
         console.error("Failed to apply texture:", err);
       }
     }
-
-    // Apply colors or transparency to Top and Tub
-    updatePartTransparency(
-      viewer,
-      "tub",
-      tubTransparent.checked,
-      tubMaterialColor,
-    );
-    updatePartTransparency(
-      viewer,
-      "lid",
-      lidTransparent.checked,
-      topMaterialColor,
-    );
+ 
+    // Colors are now handled externally via syncViewerState or updatePartTransparency
   }
 
   // --- Transparency Logic ---
@@ -277,75 +373,99 @@ window.addEventListener("DOMContentLoaded", () => {
   ) {
     if (!viewer || !viewer.model) return;
 
-    const names = part === "tub" ? TubMaterialNames : TopmaterialName;
+    const names = part === "tub" ? TubColorMaterials : LidColorMaterials;
     const targetMaterials =
       viewer.model?.materials?.filter((m) => names.includes(m.name)) || [];
 
     targetMaterials.forEach((mat) => {
       try {
+        // Cache original properties if not already cached
+        if (!originalMaterialsCache.has(mat)) {
+          originalMaterialsCache.set(mat, {
+            baseColorFactor: [...mat.pbrMetallicRoughness.baseColorFactor],
+            emissiveFactor: [...mat.emissiveFactor],
+            metallicFactor: mat.pbrMetallicRoughness.metallicFactor,
+            roughnessFactor: mat.pbrMetallicRoughness.roughnessFactor,
+            alphaMode: mat.alphaMode,
+          });
+        }
+
+        const defaults = originalMaterialsCache.get(mat);
+
         if (isTransparent) {
-          // Premium Transparency Settings
-          mat.pbrMetallicRoughness.setBaseColorFactor([0.6, 0.6, 0.6, 0.36]);
-          mat.setEmissiveFactor([0.4, 0.4, 0.4]);
-          mat.pbrMetallicRoughness.setMetallicFactor(1.0);
-          mat.pbrMetallicRoughness.setRoughnessFactor(0.12);
+          // Applying Color + Transparency (Stacking)
+          let colorArray;
+          if (colorHex) {
+            // Use manual color
+            colorArray = hexToRgbArray(colorHex);
+          } else {
+            // Use GLB default color (existing color)
+            colorArray = [
+              defaults.baseColorFactor[0],
+              defaults.baseColorFactor[1],
+              defaults.baseColorFactor[2],
+            ];
+          }
+
+          mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 0.36]);
+          mat.setEmissiveFactor([
+            colorArray[0] * 0.4,
+            colorArray[1] * 0.4,
+            colorArray[2] * 0.4,
+          ]);
+          mat.pbrMetallicRoughness.setMetallicFactor(0.8);
+          mat.pbrMetallicRoughness.setRoughnessFactor(0.18);
           mat.setAlphaMode("BLEND");
-        } else {
-          // Reset to Opaque with Color
-          const hex =
-            colorHex || (part === "tub" ? tubColor.value : topColor.value);
-          const colorArray = hexToRgbArray(hex);
+        } else if (colorHex) {
+          // Applying Manual Opaque Color
+          const colorArray = hexToRgbArray(colorHex);
           mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
           mat.setEmissiveFactor([0, 0, 0]);
-          mat.pbrMetallicRoughness.setMetallicFactor(0.0);
-          mat.pbrMetallicRoughness.setRoughnessFactor(1.0);
+
+          if (colorHex.toLowerCase() === "#ffffff") {
+            mat.pbrMetallicRoughness.setMetallicFactor(1.0);
+            mat.pbrMetallicRoughness.setRoughnessFactor(0.53);
+          } else {
+            mat.pbrMetallicRoughness.setMetallicFactor(0.0);
+            mat.pbrMetallicRoughness.setRoughnessFactor(1.0);
+          }
           mat.setAlphaMode("OPAQUE");
+        } else {
+          // RESET: Back to original GLB defaults
+          mat.pbrMetallicRoughness.setBaseColorFactor(defaults.baseColorFactor);
+          mat.setEmissiveFactor(defaults.emissiveFactor);
+          mat.pbrMetallicRoughness.setMetallicFactor(defaults.metallicFactor);
+          mat.pbrMetallicRoughness.setRoughnessFactor(defaults.roughnessFactor);
+          mat.setAlphaMode(defaults.alphaMode);
         }
         mat.doubleSided = true;
       } catch (err) {
-        console.error(`Failed to apply transparency to ${part}:`, err);
+        console.error(`Failed to apply transparency/color to ${part}:`, err);
       }
     });
   }
 
-  tubTransparent.addEventListener("change", () => {
-    updatePartTransparency(
-      modelViewer,
-      "tub",
-      tubTransparent.checked,
-      tubColor.value,
-    );
+  topColor.addEventListener("input", () => {
+    lidColorManualSet = true;
+    syncViewerState(modelViewer);
   });
 
+  tubColor.addEventListener("input", () => {
+    tubColorManualSet = true;
+    syncViewerState(modelViewer);
+  });
+
+  // Adding transparency change to manual set to ensure it reapplies correctly
   lidTransparent.addEventListener("change", () => {
-    updatePartTransparency(
-      modelViewer,
-      "lid",
-      lidTransparent.checked,
-      topColor.value,
-    );
+    syncViewerState(modelViewer);
+  });
+
+  tubTransparent.addEventListener("change", () => {
+    syncViewerState(modelViewer);
   });
 
   bgColor.addEventListener("input", () => {
     modelbg.style.backgroundColor = bgColor.value;
-  });
-
-  topColor.addEventListener("input", () => {
-    updatePartTransparency(
-      modelViewer,
-      "lid",
-      lidTransparent.checked,
-      topColor.value,
-    );
-  });
-
-  tubColor.addEventListener("input", () => {
-    updatePartTransparency(
-      modelViewer,
-      "tub",
-      tubTransparent.checked,
-      tubColor.value,
-    );
   });
 
   function checkFormValidity() {
@@ -354,7 +474,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const hasTitle = textureTitle.value.trim().length > 0;
     const hasFile = textureFile.files.length > 0;
 
-    const isDualMode = lidTextureGroup.style.display !== "none";
+    const isTubVisible = tubTextureGroup.style.display !== "none";
+    const isLidVisible = lidTextureGroup.style.display !== "none";
     const hasLidFile = lidTextureFile.files.length > 0;
 
     // Highlight Title
@@ -362,7 +483,7 @@ window.addEventListener("DOMContentLoaded", () => {
       textureTitle.classList.remove("error-highlight");
       textureTitle.classList.add("valid-highlight");
     } else {
-      textureTitle.classList.remove("valid-highlight");
+      textureTitle.classList.remove("valid-highlight", "error-highlight");
     }
 
     // Highlight File
@@ -370,17 +491,24 @@ window.addEventListener("DOMContentLoaded", () => {
       fileWrapper.classList.remove("error-highlight");
       fileWrapper.classList.add("valid-highlight");
     } else {
-      fileWrapper.classList.remove("valid-highlight");
+      fileWrapper.classList.remove("valid-highlight", "error-highlight");
     }
 
-    // Highlight Lid File (if in dual mode)
-    if (isDualMode) {
+    // Highlight Lid File (if visible)
+    if (isLidVisible) {
       if (hasLidFile) {
         lidFileWrapper.classList.remove("error-highlight");
         lidFileWrapper.classList.add("valid-highlight");
       } else {
-        lidFileWrapper.classList.remove("valid-highlight");
+        lidFileWrapper.classList.remove("valid-highlight", "error-highlight");
       }
+    } else {
+      lidFileWrapper.classList.remove("error-highlight", "valid-highlight");
+    }
+
+    // Reset Tub highlight if not visible
+    if (!isTubVisible) {
+      fileWrapper.classList.remove("error-highlight", "valid-highlight");
     }
 
     renderBtn.disabled = false; // Keep it enabled for manual trigger
@@ -390,37 +518,30 @@ window.addEventListener("DOMContentLoaded", () => {
   async function updateMainModelViewer() {
     const tubFile = textureFile.files[0];
     const lidFile = lidTextureFile.files[0];
-    const isDualMode = lidTextureGroup.style.display !== "none";
+    const isTubVisible = tubTextureGroup.style.display !== "none";
+    const isLidVisible = lidTextureGroup.style.display !== "none";
 
-    if (!tubFile && (!isDualMode || !lidFile)) return;
+    // Only return if at least one file is required but neither is provided
+    if (isTubVisible && isLidVisible && !tubFile && !lidFile) return;
+    if (isTubVisible && !isLidVisible && !tubFile) return;
+    if (isLidVisible && !isTubVisible && !lidFile) return;
 
     const topMaterialColor = topColor.value;
 
     if (tubFile) {
       const tubReader = new FileReader();
       tubReader.onload = async (event) => {
-        const textureDataURL = event.target.result;
-        await tryApplyMaterialTexture(
-          modelViewer,
-          TubMaterialNames,
-          textureDataURL,
-          !isDualMode ? topColor.value : null,
-          tubColor.value,
-        );
+        currentTubTextureDataURL = event.target.result;
+        await syncViewerState(modelViewer);
       };
       tubReader.readAsDataURL(tubFile);
     }
 
-    if (isDualMode && lidFile) {
+    if (isLidVisible && lidFile) {
       const lidReader = new FileReader();
       lidReader.onload = async (event) => {
-        const lidTextureDataURL = event.target.result;
-        await tryApplyMaterialTexture(
-          modelViewer,
-          Topmaterialtexture,
-          lidTextureDataURL,
-          null,
-        );
+        currentLidTextureDataURL = event.target.result;
+        await syncViewerState(modelViewer);
       };
       lidReader.readAsDataURL(lidFile);
     }
@@ -521,20 +642,32 @@ window.addEventListener("DOMContentLoaded", () => {
       cardModelViewer.style.pointerEvents = "none";
 
       cardModelViewer.addEventListener("load", async () => {
+        // Apply plastic colors first
+        updatePartTransparency(
+          cardModelViewer,
+          "lid",
+          isLidTransparent,
+          topMaterialColor,
+        );
+        updatePartTransparency(
+          cardModelViewer,
+          "tub",
+          isTubTransparent,
+          tubMaterialColor,
+        );
+
         if (tubTextureDataURL) {
           await tryApplyMaterialTexture(
             cardModelViewer,
-            materialName,
+            TubTextureMaterials,
             tubTextureDataURL,
-            lidTextureDataURL ? null : topMaterialColor,
           );
         }
         if (lidTextureDataURL) {
           await tryApplyMaterialTexture(
             cardModelViewer,
-            TopmaterialName,
+            LidTextureMaterials,
             lidTextureDataURL,
-            null,
           );
         }
       });
@@ -626,6 +759,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (typeof toggleClearButtonState === "function") {
       toggleClearButtonState();
     }
+
+    // Update scroll buttons visibility
+    if (typeof updateScrollButtons === "function") {
+      updateScrollButtons();
+    }
   }
 
   // Event listeners
@@ -633,7 +771,7 @@ window.addEventListener("DOMContentLoaded", () => {
   textureFile.addEventListener("change", () => {
     const fileWrapper = textureFile.closest(".file-upload-wrapper");
     if (textureFile.files.length > 0) {
-      fileName.textContent = textureFile.files[0].name;
+      fileName.textContent = truncateFileName(textureFile.files[0].name);
       fileWrapper.classList.remove("error-highlight");
     } else {
       fileName.textContent = "No file chosen";
@@ -645,7 +783,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   lidTextureFile.addEventListener("change", () => {
     if (lidTextureFile.files.length > 0) {
-      lidFileName.textContent = lidTextureFile.files[0].name;
+      lidFileName.textContent = truncateFileName(lidTextureFile.files[0].name);
       lidTextureFile
         .closest(".file-upload-wrapper")
         .classList.remove("error-highlight");
@@ -732,6 +870,10 @@ window.addEventListener("DOMContentLoaded", () => {
           console.error("Failed to capture model snapshot:", err);
         }
 
+        const orbit = modelViewer.getCameraOrbit();
+        const currentLiveOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg ${orbit.radius.toFixed(4)}m`;
+        const currentLiveFOV = `${modelViewer.getFieldOfView().toFixed(2)}deg`;
+
         const card = createRenderedCard(
           tubTextureDataURL,
           title,
@@ -740,8 +882,8 @@ window.addEventListener("DOMContentLoaded", () => {
           snapshotDataURL,
           backgroundColor,
           lidDataURL,
-          modelViewer.getAttribute("camera-orbit"),
-          modelViewer.getAttribute("field-of-view"),
+          currentLiveOrbit,
+          currentLiveFOV,
           tubColor.value,
           tubTransparent.checked,
           lidTransparent.checked,
@@ -751,14 +893,18 @@ window.addEventListener("DOMContentLoaded", () => {
         card.classList.add("selected");
         updateSelectionInfo();
 
+        // Scroll to the new card
+        setTimeout(() => {
+          renderedImages.scrollTo({
+            left: renderedImages.scrollWidth,
+            behavior: "smooth",
+          });
+        }, 100);
+
         // Clear form
-        textureTitle.value = "";
-        textureFile.value = "";
-        fileName.textContent = "No file chosen";
-        lidTextureFile.value = "";
-        lidFileName.textContent = "No file chosen";
+        resetTextureInputs();
         topColor.value = "#ffffff";
-        bgColor.value = "#ffffff";
+        bgColor.value = "#c7c7c7";
         tubTransparent.checked = false;
         lidTransparent.checked = false;
         modelbg.style.backgroundColor = "#c7c7c7";
@@ -874,7 +1020,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const file = e.target.files[0];
     const logoFileNameText = document.getElementById("logoFileName");
     if (file) {
-      logoFileNameText.textContent = file.name;
+      logoFileNameText.textContent = truncateFileName(file.name);
       const reader = new FileReader();
       reader.onload = (event) => {
         customLogoPreview.src = event.target.result;
@@ -933,171 +1079,205 @@ window.addEventListener("DOMContentLoaded", () => {
       models: [
         {
           name: "120ml Round",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-containers/120ml-round/120ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/120ml-round/120ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.35m",
+              minDist: 0.35,
+              maxDist: 0.35,
+              image:
+                "./assets/Angles/round-containers/120ml-round/120ml-round-Main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/120ml-round/120ml-angle-glb-1.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-containers/120ml-round/120ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/round-containers/120ml-round/120ml-angle-glb-2.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-containers/120ml-round/120ml-round-angle-2.png",
             },
           ],
         },
         {
           name: "250ml Round",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-containers/250ml-round/250ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/round-containers/250ml-round/250ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/round-containers/250ml-round/250ml-round-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/round-containers/250ml-round/250ml-angle-glb-1.glb",
+              cameraOrbit: "0deg 75deg 0.50m",
+              minDist: 0.5,
+              maxDist: 0.5,
+              image:
+                "./assets/Angles/round-containers/250ml-round/250ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/250ml/250ml_2.webp",
+              src: "./assets/Angles/round-containers/250ml-round/250ml-angle-glb-2.glb",
+              cameraOrbit: "0deg 75deg 0.50m",
+              minDist: 0.5,
+              maxDist: 0.5,
+              image:
+                "./assets/Angles/round-containers/250ml-round/250ml-round-angle-2.png",
+            },
+          ],
+        },
+        {
+          name: "300ml Round",
+          frontSrc:
+            "./assets/Angles/round-containers/300ml-round/300ml-main.glb",
+          angles: [
+            {
+              name: "Main",
+              src: "./assets/Angles/round-containers/300ml-round/300ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-containers/300ml-round/300ml-round-main.png",
             },
             {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/250ml/250ml_3.webp",
+              name: "Front",
+              src: "./assets/Angles/round-containers/300ml-round/300ml-angle-glb-1.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/round-containers/300ml-round/300ml-round-angle-1.png",
+            },
+            {
+              name: "Side",
+              src: "./assets/Angles/round-containers/300ml-round/300ml-angle-glb-2.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/round-containers/300ml-round/300ml-round-angle-2.png",
             },
           ],
         },
         {
           name: "500ml Round",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-containers/500ml-round/500ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/500ml-round/500ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.35m",
+              minDist: 0.35,
+              maxDist: 0.35,
+              image:
+                "./assets/Angles/round-containers/500ml-round/500ml-round-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/500ml-round/500ml-angle-glb-1.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-containers/500ml-round/500ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/round-containers/500ml-round/500ml-angle-glb-2.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-containers/500ml-round/500ml-round-angle-2.png",
             },
           ],
         },
         {
           name: "750ml Round",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-containers/750ml-round/750ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/750ml-round/750ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.50m",
+              minDist: 0.5,
+              maxDist: 0.5,
+              image:
+                "./assets/Angles/round-containers/750ml-round/750ml-round-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/750ml-round/750ml-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.90m",
+              minDist: 0.9,
+              maxDist: 0.9,
+              image:
+                "./assets/Angles/round-containers/750ml-round/750ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/round-containers/750ml-round/750ml-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.75m",
+              minDist: 0.75,
+              maxDist: 0.75,
+              image:
+                "./assets/Angles/round-containers/750ml-round/750ml-round-angle-2.png",
             },
           ],
         },
         {
           name: "1000ml Round",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-containers/1000ml-round/1000ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/1000ml-round/1000ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-containers/1000ml-round/1000ml-round-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-containers/1000ml-round/1000ml-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/round-containers/1000ml-round/1000ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/round-containers/1000ml-round/1000ml-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.75m",
+              minDist: 0.75,
+              maxDist: 0.75,
+              image:
+                "./assets/Angles/round-containers/1000ml-round/1000ml-round-angle-2.png",
             },
           ],
         },
@@ -1108,69 +1288,69 @@ window.addEventListener("DOMContentLoaded", () => {
       models: [
         {
           name: "450ml/500g Round Square",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-square-containers/450ml-round-square/450ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-square-containers/450ml-round-square/450ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-square-containers/450ml-round-square/450ml-round-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-square-containers/450ml-round-square/450ml-angle-glb-1.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/round-square-containers/450ml-round-square/450ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/round-square-containers/450ml-round-square/450ml-angle-glb-2.glb",
+              cameraOrbit: "0deg 75deg 0.6m",
+              minDist: 0.6,
+              maxDist: 0.6,
+              image:
+                "./assets/Angles/round-square-containers/450ml-round-square/450ml-round-angle-2.png",
             },
           ],
         },
         {
           name: "500ml Round Square",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/round-square-containers/500ml-round-square/500ml-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-square-containers/500ml-round-square/500ml-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/round-square-containers/500ml-round-square/500ml-round-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/round-square-containers/500ml-round-square/500ml-angle-glb-1.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/round-square-containers/500ml-round-square/500ml-round-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/round-square-containers/500ml-round-square/500ml-angle-glb-2.glb",
+              cameraOrbit: "0deg 75deg 0.6m",
+              minDist: 0.6,
+              maxDist: 0.6,
+              image:
+                "./assets/Angles/round-square-containers/500ml-round-square/500ml-round-angle-2.png",
             },
           ],
         },
@@ -1181,103 +1361,103 @@ window.addEventListener("DOMContentLoaded", () => {
       models: [
         {
           name: "500ml Rectangle",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-main.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.75m",
+              minDist: 0.75,
+              maxDist: 0.75,
+              image:
+                "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-angle-2.png",
             },
           ],
         },
         {
           name: "650ml Rectangle",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-main.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.75m",
+              minDist: 0.75,
+              maxDist: 0.75,
+              image:
+                "./assets/Angles/Rectangle/650ml-rectangle/650ml-rectangular-angle-2.png",
             },
           ],
         },
         {
           name: "750ml Rectangle",
-          frontSrc: "./assets/Model_Export/500ml Round A-1 .glb",
+          frontSrc:
+            "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-main.glb",
+              cameraOrbit: "0deg 75deg 0.55m",
+              minDist: 0.55,
+              maxDist: 0.55,
+              image:
+                "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/500ml Round A-1 .glb",
-              cameraOrbit: "0deg 75deg 0.3644m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/poster_1.png",
+              src: "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/500ml Round A-2 .glb",
-              cameraOrbit: "10deg 78deg  0.7649m",
-              minCameraOrbit: "-Infinity auto 0.55m",
-              image: "./assets/Angles/500ml/500ml_angle2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/500ml Round A-3 .glb",
-              cameraOrbit: "-340.4999816894526deg 84.49deg 0.7649m",
-              minCameraOrbit: "-Infinity auto 0.65m",
-              image: "./assets/Angles/500ml/500ml_angle3.webp",
+              src: "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.75m",
+              minDist: 0.75,
+              maxDist: 0.75,
+              image:
+                "./assets/Angles/Rectangle/750ml-rectangle/750ml-rectangular-angle-2.png",
             },
           ],
         },
@@ -1288,103 +1468,103 @@ window.addEventListener("DOMContentLoaded", () => {
       models: [
         {
           name: "250g Sweet Box",
-          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          frontSrc:
+            "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-main.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-angle-1.glb",
+              cameraOrbit: "0deg 75deg 1.05m",
+              minDist: 1.05,
+              maxDist: 1.05,
+              image:
+                "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/250  SB A-2.glb",
-              cameraOrbit: "337deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/250  SB A-3.glb",
-              cameraOrbit: "320deg 70deg 0.65m",
-              minCameraOrbit: "-Infinity auto 1.49m",
-              image: "./assets/Angles/250ml/250ml_3.webp",
+              src: "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-angle-2.glb",
+              cameraOrbit: "0deg 75deg 1.05m",
+              minDist: 1.05,
+              maxDist: 1.05,
+              image:
+                "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-angle-2.png",
             },
           ],
         },
         {
           name: "500g Sweet Box",
-          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          frontSrc:
+            "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-main.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.85m",
+              minDist: 0.85,
+              maxDist: 0.85,
+              image:
+                "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/250  SB A-2.glb",
-              cameraOrbit: "337deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/250  SB A-3.glb",
-              cameraOrbit: "320deg 70deg 0.65m",
-              minCameraOrbit: "-Infinity auto 1.49m",
-              image: "./assets/Angles/250ml/250ml_3.webp",
+              src: "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.85m",
+              minDist: 0.85,
+              maxDist: 0.85,
+              image:
+                "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-angle-2.png",
             },
           ],
         },
         {
           name: "1kg Sweet Box",
-          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          frontSrc:
+            "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-main.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.85m",
+              minDist: 0.85,
+              maxDist: 0.85,
+              image:
+                "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/250  SB A-2.glb",
-              cameraOrbit: "337deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/250  SB A-3.glb",
-              cameraOrbit: "320deg 70deg 0.65m",
-              minCameraOrbit: "-Infinity auto 1.49m",
-              image: "./assets/Angles/250ml/250ml_3.webp",
+              src: "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.85m",
+              minDist: 0.85,
+              maxDist: 0.85,
+              image:
+                "./assets/Angles/Sweet-Box/1kg-sweet-box/1kg-sweet-box-angle-2.png",
             },
           ],
         },
@@ -1395,69 +1575,69 @@ window.addEventListener("DOMContentLoaded", () => {
       models: [
         {
           name: "250g Sweet Box TE",
-          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          frontSrc:
+            "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/250  SB A-2.glb",
-              cameraOrbit: "337deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/250  SB A-3.glb",
-              cameraOrbit: "320deg 70deg 0.65m",
-              minCameraOrbit: "-Infinity auto 1.49m",
-              image: "./assets/Angles/250ml/250ml_3.webp",
+              src: "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-angle-2.png",
             },
           ],
         },
         {
           name: "500g Sweet Box TE",
-          frontSrc: "./assets/Model_Export/250  SB A-1.glb",
+          frontSrc:
+            "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.glb",
+              cameraOrbit: "0deg 75deg 0.45m",
+              minDist: 0.45,
+              maxDist: 0.45,
+              image:
+                "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.png",
             },
             {
               name: "Front",
-              src: "./assets/Model_Export/250  SB A-1.glb",
-              cameraOrbit: "340deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_1.webp",
+              src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-1.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-1.png",
             },
             {
               name: "Side",
-              src: "./assets/Model_Export/250  SB A-2.glb",
-              cameraOrbit: "337deg 68deg 0.5m",
-              minCameraOrbit: "-Infinity auto 1.15m",
-              image: "./assets/Angles/250ml/250ml_2.webp",
-            },
-            {
-              name: "Back",
-              src: "./assets/Model_Export/250  SB A-3.glb",
-              cameraOrbit: "320deg 70deg 0.65m",
-              minCameraOrbit: "-Infinity auto 1.49m",
-              image: "./assets/Angles/250ml/250ml_3.webp",
+              src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-2.glb",
+              cameraOrbit: "0deg 75deg 0.65m",
+              minDist: 0.65,
+              maxDist: 0.65,
+              image:
+                "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-2.png",
             },
           ],
         },
@@ -1502,6 +1682,7 @@ window.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll(".model-category-item").forEach((item) => {
           if (item !== categoryEl) item.classList.remove("open");
         });
+
         categoryEl.classList.toggle("open");
       };
 
@@ -1516,10 +1697,16 @@ window.addEventListener("DOMContentLoaded", () => {
         mv.setAttribute("disable-tap", "");
         mv.setAttribute("disable-pan", "");
         mv.setAttribute("interaction-prompt", "none");
-        mv.setAttribute("camera-orbit", model.angles[0].cameraOrbit);
-        mv.setAttribute("field-of-view", "35deg");
+
+        // Use auto framing for thumbnails to ensure they fit the card
+        const orbit = model.angles[0].cameraOrbit || "0deg 75deg 0.75m";
+        const parts = orbit.split(" ");
+        mv.setAttribute("camera-orbit", `${parts[0]} ${parts[1]} auto`);
+        mv.setAttribute("min-camera-orbit", "auto auto auto");
+        mv.setAttribute("field-of-view", "auto");
         mv.setAttribute("shadow-intensity", "0");
         mv.setAttribute("exposure", "1");
+        mv.style.pointerEvents = "none"; // Thumbnails don't need interaction
 
         const label = document.createElement("div");
         label.textContent = model.name;
@@ -1531,6 +1718,13 @@ window.addEventListener("DOMContentLoaded", () => {
           e.stopPropagation(); // Prevent accordion toggle
           selectedModelIndex = mIdx;
           selectedAngleIndex = 0;
+
+          // Reset everything to default look when switching models
+          lidColorManualSet = false;
+          tubColorManualSet = false;
+          lidTransparent.checked = false;
+          tubTransparent.checked = false;
+          resetTextureInputs();
 
           highlightSelectedInAccordion();
           renderAngles();
@@ -1590,6 +1784,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
       angleCard.addEventListener("click", () => {
         selectedAngleIndex = i;
+
+        // Reset everything to default look when switching angles
+        lidColorManualSet = false;
+        tubColorManualSet = false;
+        lidTransparent.checked = false;
+        tubTransparent.checked = false;
+        resetTextureInputs();
+
         highlightSelected(angleContainer, selectedAngleIndex);
         updateMainViewer();
       });
@@ -1598,46 +1800,111 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     // Update upload UI based on category
-    const category = categorizedModels.find((c) =>
+    const modelCategory = categorizedModels.find((c) =>
       c.models.includes(selectedModel),
     )?.category;
-    if (category === "Square" || category === "Square TE") {
+
+    const isSweetBox =
+      modelCategory === "Sweet Box" ||
+      modelCategory === "Sweet Box TE" ||
+      modelCategory === "Square" ||
+      modelCategory === "Square TE" ||
+      modelCategory === "Square Box TE";
+    const isRectangle = modelCategory === "Rectangle";
+    const isRound =
+      modelCategory === "Round" || modelCategory === "Round Square";
+
+    if (selectedModel.name === "1kg Sweet Box") {
+      tubTextureGroup.style.display = "none";
+      lidTextureGroup.style.display = "flex";
+    } else if (isSweetBox) {
+      tubTextureGroup.style.display = "flex";
       lidTextureGroup.style.display = "flex";
       textureLabel.innerHTML = 'Tub Texture <span style="color: red;">*</span>';
+    } else if (isRectangle) {
+      tubTextureGroup.style.display = "none";
+      lidTextureGroup.style.display = "flex";
+    } else if (isRound) {
+      tubTextureGroup.style.display = "flex";
+      lidTextureGroup.style.display = "none";
+      textureLabel.innerHTML = 'Tub Texture <span style="color: red;">*</span>';
     } else {
+      // Default fallback
+      tubTextureGroup.style.display = "flex";
       lidTextureGroup.style.display = "none";
       textureLabel.innerHTML =
         'Upload Texture <span style="color: red;">*</span>';
     }
+
+    resetTextureInputs();
     checkFormValidity();
+  }
+
+  function resetTextureInputs() {
+    if (textureFile) {
+      textureFile.value = "";
+      if (fileName) {
+        fileName.textContent = "No file chosen";
+      }
+      currentTubTextureDataURL = null;
+      const fileWrapper = textureFile.closest(".file-upload-wrapper");
+      if (fileWrapper) {
+        fileWrapper.classList.remove("valid-highlight", "error-highlight");
+      }
+    }
+    if (lidTextureFile) {
+      lidTextureFile.value = "";
+      if (lidFileName) {
+        lidFileName.textContent = "No file chosen";
+      }
+      currentLidTextureDataURL = null;
+      const lidFileWrapper = lidTextureFile.closest(".file-upload-wrapper");
+      if (lidFileWrapper) {
+        lidFileWrapper.classList.remove("valid-highlight", "error-highlight");
+      }
+    }
+    if (textureTitle) {
+      textureTitle.value = "";
+      textureTitle.classList.remove("valid-highlight", "error-highlight");
+    }
   }
 
   function updateMainViewer() {
     if (selectedModelIndex === null || selectedAngleIndex === null) return;
 
-    const selectedAngle = models[selectedModelIndex].angles[selectedAngleIndex];
+    const selectedModel = models[selectedModelIndex];
+    const selectedAngle = selectedModel.angles[selectedAngleIndex];
+
+    // Support per-angle zoom and FOV overrides
+    const minDist = selectedAngle.minDist || 0.6;
+    const maxDist = selectedAngle.maxDist || 0.6;
+    const fov = selectedAngle.fov || "20deg";
+
     mainModelViewer.setAttribute("src", selectedAngle.src);
+
+    // Apply specific constraints
     mainModelViewer.setAttribute(
       "min-camera-orbit",
-      selectedAngle.minCameraOrbit,
+      selectedAngle.minCameraOrbit || `auto auto ${minDist}m`,
     );
-    mainModelViewer.setAttribute("shadow-intensity", "0"); // Add this
-    mainModelViewer.setAttribute("exposure", "1"); // Add this
+    mainModelViewer.setAttribute(
+      "max-camera-orbit",
+      selectedAngle.maxCameraOrbit || `auto auto ${maxDist}m`,
+    );
+
+    // Allow FOV range for zooming to work
+    mainModelViewer.setAttribute("min-field-of-view", "10deg");
+    mainModelViewer.setAttribute("max-field-of-view", "45deg");
+    mainModelViewer.setAttribute("field-of-view", fov);
+
+    mainModelViewer.setAttribute("shadow-intensity", "0");
+    mainModelViewer.setAttribute("exposure", "1");
     mainModelViewer.setAttribute("environment-image", "neutral");
 
-    // Parse the stored camera orbit to get rotation angles
-    const orbitParts = selectedAngle.cameraOrbit.split(" ");
-    const rotationX = orbitParts[0]; // e.g., '0deg'
-    const rotationY = orbitParts[1]; // e.g., '75deg'
-
-    // Reset zoom to default when changing models/angles
-    currentZoom = zoomLevels[0];
-    currentZoomIndex = 0;
-
-    // Apply stored rotation with current zoom level
+    // Apply the stored camera orbit (including distance)
     mainModelViewer.setAttribute(
       "camera-orbit",
-      `${rotationX} ${rotationY} ${currentZoom}m`,
+      selectedAngle.cameraOrbit || `0deg 75deg 0.6m`,
     );
   }
 
@@ -1713,23 +1980,21 @@ window.addEventListener("DOMContentLoaded", () => {
     tubMaterialColor = null,
     isTubTransparent = false,
     isLidTransparent = false,
+    backgroundColor = "transparent",
+    cameraTarget = null,
   ) {
     console.log("Creating PDF model viewer...");
 
     const pdfModelViewer = document.createElement("model-viewer");
     pdfModelViewer.src = modelSrcForCard || modelSrc;
 
-    // Use the stored orbit if available, but set distance to 'auto' to ensure it fits perfectly
+    // Use the stored orbit rotation but set distance to 'auto' to prevent cropping
     if (cameraOrbit) {
       const parts = cameraOrbit.split(" ");
-      if (parts.length >= 2) {
-        pdfModelViewer.setAttribute(
-          "camera-orbit",
-          `${parts[0]} ${parts[1]} auto`,
-        );
-      } else {
-        pdfModelViewer.setAttribute("camera-orbit", "auto auto auto");
-      }
+      pdfModelViewer.setAttribute(
+        "camera-orbit",
+        `${parts[0]} ${parts[1]} auto`,
+      );
     } else {
       pdfModelViewer.setAttribute("camera-orbit", "auto auto auto");
     }
@@ -1740,9 +2005,38 @@ window.addEventListener("DOMContentLoaded", () => {
       pdfModelViewer.setAttribute("field-of-view", "auto");
     }
 
-    pdfModelViewer.setAttribute("camera-target", "0m 0m 0m");
-    pdfModelViewer.setAttribute("min-camera-orbit", "auto auto auto");
-    pdfModelViewer.setAttribute("max-camera-orbit", "auto auto auto");
+    if (cameraTarget) {
+      pdfModelViewer.setAttribute("camera-target", cameraTarget);
+    } else {
+      pdfModelViewer.setAttribute("camera-target", "auto auto auto");
+    }
+    // Use manual values from selected angle if possible, otherwise use fallbacks
+    // Try to find the matching angle's config from categorizedModels
+    let manualMinDist = 0.6;
+    let manualMaxDist = 0.6;
+    let manualFov = "20deg";
+
+    const currentModel = categorizedModels
+      .flatMap((c) => c.models)
+      .find((m) => m.frontSrc === modelSrcForCard);
+
+    if (currentModel && currentModel.angles && currentModel.angles.length > 0) {
+      // Use the first angle as default for PDF if specific one isn't tracked here
+      const firstAngle = currentModel.angles[0];
+      manualMinDist = firstAngle.minDist || 0.6;
+      manualMaxDist = firstAngle.maxDist || 0.6;
+      manualFov = firstAngle.fov || "20deg";
+    }
+
+    pdfModelViewer.setAttribute(
+      "min-camera-orbit",
+      `auto auto ${manualMinDist}m`,
+    );
+    pdfModelViewer.setAttribute(
+      "max-camera-orbit",
+      `auto auto ${manualMaxDist}m`,
+    );
+    pdfModelViewer.setAttribute("field-of-view", manualFov);
     pdfModelViewer.setAttribute("disable-tap", "");
     pdfModelViewer.setAttribute("disable-pan", "");
     pdfModelViewer.setAttribute("interaction-prompt", "none");
@@ -1754,7 +2048,7 @@ window.addEventListener("DOMContentLoaded", () => {
     pdfModelViewer.style.top = "50%";
     pdfModelViewer.style.transform = "translate(-50%, -50%)";
     pdfModelViewer.style.zIndex = "-1";
-    pdfModelViewer.style.backgroundColor = "transparent"; // Changed from 0.95 white
+    pdfModelViewer.style.backgroundColor = backgroundColor;
 
     document.body.appendChild(pdfModelViewer);
     console.log("PDF model viewer added to DOM");
@@ -1774,33 +2068,37 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     console.log("Model loaded successfully");
-    console.log("Applying texture and color...");
+    console.log("Applying colors and textures...");
+
+    // Apply plastic colors and transparency explicitly
+    updatePartTransparency(
+      pdfModelViewer,
+      "lid",
+      isLidTransparent,
+      topMaterialColor,
+    );
+    updatePartTransparency(
+      pdfModelViewer,
+      "tub",
+      isTubTransparent,
+      tubMaterialColor,
+    );
+
     if (tubTextureDataURL) {
       await tryApplyMaterialTexture(
         pdfModelViewer,
-        TubMaterialNames,
+        TubTextureMaterials,
         tubTextureDataURL,
-        lidTextureDataURL ? null : topMaterialColor,
-        tubMaterialColor,
       );
     }
     if (lidTextureDataURL) {
       await tryApplyMaterialTexture(
         pdfModelViewer,
-        Topmaterialtexture,
+        LidTextureMaterials,
         lidTextureDataURL,
-        null,
-        null,
       );
     }
     console.log("Texture and color applied");
-
-    if (isTubTransparent) {
-      updatePartTransparency(pdfModelViewer, "tub", true);
-    }
-    if (isLidTransparent) {
-      updatePartTransparency(pdfModelViewer, "lid", true);
-    }
 
     // Increased wait time for UHD 4K rendering and anti-aliasing
     await new Promise((r) => setTimeout(r, 1500));
@@ -1810,30 +2108,49 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Capture from PDF model viewer ---
-  async function capturePDFModelImage(pdfModelViewer) {
+  async function capturePDFModelImage(
+    pdfModelViewer,
+    mimeType = "image/png",
+    quality = 1.0,
+    backgroundColor = "transparent",
+  ) {
     if (!pdfModelViewer) {
       console.error("No model viewer provided");
       return null;
     }
 
-    console.log("Attempting to capture image...");
+    console.log(`Attempting to capture image as ${mimeType}...`);
 
     let canvas = null;
 
     if (pdfModelViewer.shadowRoot) {
       canvas = pdfModelViewer.shadowRoot.querySelector("canvas");
-      console.log("Canvas from shadow root:", canvas);
     }
 
     if (!canvas) {
       canvas = pdfModelViewer.querySelector("canvas");
-      console.log("Canvas from direct query:", canvas);
     }
 
     if (canvas) {
       try {
         console.log("Canvas dimensions:", canvas.width, "x", canvas.height);
-        const dataURL = canvas.toDataURL("image/png", 1.0);
+
+        // Create a temporary canvas for compositing the background
+        const compositeCanvas = document.createElement("canvas");
+        compositeCanvas.width = canvas.width;
+        compositeCanvas.height = canvas.height;
+        const ctx = compositeCanvas.getContext("2d");
+
+        // Fill background if not transparent
+        if (backgroundColor !== "transparent") {
+          ctx.fillStyle = backgroundColor;
+          ctx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+        }
+
+        // Draw the model-viewer canvas on top
+        ctx.drawImage(canvas, 0, 0);
+
+        const dataURL = compositeCanvas.toDataURL(mimeType, quality);
         console.log("Image captured successfully, length:", dataURL.length);
         return dataURL;
       } catch (e) {
@@ -2222,32 +2539,167 @@ window.addEventListener("DOMContentLoaded", () => {
   const downloadModelBtn = document.getElementById("downloadModelBtn");
   const exportFormat = document.getElementById("exportFormat");
 
-  downloadModelBtn.addEventListener("click", () => {
+  downloadModelBtn.addEventListener("click", async () => {
     const format = exportFormat.value;
     const mimeType = format === "png" ? "image/png" : "image/jpeg";
     const extension = format === "png" ? "png" : "jpg";
 
     try {
-      // Capture the current frame from model-viewer
-      const dataUrl = mainModelViewer.toDataURL(mimeType);
+      // Show high-end full-page loader
+      const loadingOverlay = document.getElementById("pdfLoadingOverlay");
+      const loadingText = loadingOverlay.querySelector("span");
+      loadingText.textContent = `Rendering UHD ${format.toUpperCase()}...`;
+      loadingOverlay.style.display = "flex";
 
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `TerraTech_Model_Capture_${new Date().getTime()}.${extension}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Disable button
+      const originalContent = downloadModelBtn.innerHTML;
+      downloadModelBtn.disabled = true;
 
-      console.log(`Model successfully exported as ${format.toUpperCase()}`);
+      // Use the high-res capture logic
+      const uhdSize = 3840; // 4K Resolution
+      const currentModelSrc = mainModelViewer.getAttribute("src");
+      const orbit = mainModelViewer.getCameraOrbit();
+      // Use 'auto' for distance to ensure the full model fits in the high-res frame
+      const currentOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg auto`;
+      const currentFOV = `${mainModelViewer.getFieldOfView().toFixed(2)}deg`;
+
+      const target = mainModelViewer.getCameraTarget();
+      const currentTarget = `${target.x}m ${target.y}m ${target.z}m`;
+
+      // For PNG we force transparency, for JPG we use the background color
+      const captureBG = format === "png" ? "transparent" : bgColor.value;
+
+      // Create a temporary high-res model viewer
+      const captureViewer = await createPDFModelViewer(
+        currentModelSrc,
+        currentTubTextureDataURL,
+        topColor.value,
+        uhdSize,
+        currentLidTextureDataURL,
+        currentOrbit,
+        currentFOV,
+        tubColor.value,
+        tubTransparent.checked,
+        lidTransparent.checked,
+        captureBG,
+        currentTarget,
+      );
+
+      // Wait for high-res shaders and lighting to settle
+      await new Promise((r) => setTimeout(r, 1500));
+
+      // Capture the image with 100% quality and requested transparency/background
+      let dataUrl = await capturePDFModelImage(
+        captureViewer,
+        mimeType,
+        1.0,
+        captureBG,
+      );
+
+      if (dataUrl) {
+        // High-end refinement: Trim transparency to make the model center-fit in the final file
+        try {
+          dataUrl = await trimTransparency(dataUrl);
+        } catch (e) {
+          console.warn(
+            "Trimming failed during direct export, using raw capture",
+            e,
+          );
+        }
+
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = `TerraTech_UHD_Capture_${new Date().getTime()}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        throw new Error("Failed to generate capture");
+      }
+
+      // Cleanup
+      if (captureViewer.parentNode) {
+        captureViewer.parentNode.removeChild(captureViewer);
+      }
+
+      // Hide loader and restore button
+      loadingOverlay.style.display = "none";
+      downloadModelBtn.disabled = false;
+      downloadModelBtn.innerHTML = originalContent;
     } catch (error) {
-      console.error("Image capture failed:", error);
-      alert("Failed to capture model image. Please try again.");
+      console.error("UHD capture failed:", error);
+
+      // Hide loader for fallback
+      const loadingOverlay = document.getElementById("pdfLoadingOverlay");
+      if (loadingOverlay) loadingOverlay.style.display = "none";
+
+      alert("Failed to capture UHD image. Using standard quality as fallback.");
+
+      // Fallback to standard quality
+      try {
+        const dataUrl = mainModelViewer.toDataURL(mimeType);
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = `TerraTech_Standard_Capture_${new Date().getTime()}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (fallbackError) {
+        console.error("Fallback capture also failed:", fallbackError);
+      }
+
+      downloadModelBtn.disabled = false;
+      downloadModelBtn.innerHTML =
+        '<i class="fa-solid fa-cloud-arrow-down"></i> Export Capture';
     }
   });
+
+  // Rendered Images Scroll Buttons
+
+  function updateScrollButtons() {
+    if (!renderedImages || !scrollLeftBtn || !scrollRightBtn) return;
+
+    // A slightly longer timeout to ensure cards are fully in the DOM and layout is stable
+    setTimeout(() => {
+      const scrollLeft = Math.round(renderedImages.scrollLeft);
+      const scrollWidth = renderedImages.scrollWidth;
+      const clientWidth = renderedImages.clientWidth;
+
+      // Check for overflow (with a small 2px tolerance)
+      const hasOverflow = scrollWidth > clientWidth + 2;
+
+      if (!hasOverflow) {
+        scrollLeftBtn.style.display = "none";
+        scrollRightBtn.style.display = "none";
+        return;
+      }
+
+      // Show/Hide left button: visible if we have scrolled away from the start
+      scrollLeftBtn.style.display = scrollLeft > 5 ? "flex" : "none";
+
+      // Show/Hide right button: visible if there's more to scroll to the right
+      const atEnd = scrollLeft + clientWidth >= scrollWidth - 5;
+      scrollRightBtn.style.display = atEnd ? "none" : "flex";
+    }, 250);
+  }
+
+  // Monitor for any changes in the rendered images container (new cards, removed cards, etc)
+  const renderObserver = new MutationObserver(() => {
+    updateScrollButtons();
+  });
+
+  if (renderedImages) {
+    renderObserver.observe(renderedImages, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+  }
 
   // Initialize
   checkFormValidity();
   updateSelectionInfo();
+  updateScrollButtons();
 
   // Make renderedModels globally accessible
   window.renderedModels = renderedModels;

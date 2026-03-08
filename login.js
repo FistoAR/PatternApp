@@ -194,6 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
         .then((res) => res.json())
         .then((result) => {
           if (result.success) {
+            localStorage.setItem("isLoggedIn", "true");
             showCustomAlert("Sign In Successful!", "Success");
             signInForm.reset();
             window.location.href = "admin.html";

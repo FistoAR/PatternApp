@@ -19,6 +19,7 @@ function initCategoryPage() {
 
   if (openBtn) {
     openBtn.addEventListener("click", () => {
+      resetForm();
       modal.style.display = "flex";
     });
   }
@@ -208,6 +209,7 @@ async function removeCategory(id, categoryName, shapeType) {
   showConfirm(
     `Deleting "${categoryName}" will also remove all its patterns. Continue?`,
     async () => {
+      showLoading(`Removing "${categoryName}" and its patterns...`);
       try {
         // 1. Fetch all patterns to find matches
         const pRes = await fetch(CAT_API_FETCH_PATTERNS, {
@@ -224,7 +226,8 @@ async function removeCategory(id, categoryName, shapeType) {
             const pShape = (p.shape_type || "").trim().toLowerCase();
             const cCat = (categoryName || "").trim().toLowerCase();
             const cShape = (shapeType || "").trim().toLowerCase();
-            return pCat === cCat && (pShape === cShape || pShape === "");
+            // Strictly match both category and shape
+            return pCat === cCat && pShape === cShape;
           });
 
           // 2. Delete each matching pattern
@@ -247,15 +250,18 @@ async function removeCategory(id, categoryName, shapeType) {
         const data = await response.json();
 
         if (data.status === "success") {
+          hideLoading();
           showAlert("Category and all associated patterns removed.");
           fetchCategories();
         } else {
+          hideLoading();
           showAlert(
             "Error removing category: " + (data.message || "Unknown error"),
             "error",
           );
         }
       } catch (error) {
+        hideLoading();
         console.error("Remove error:", error);
         showAlert("An error occurred during cascading deletion.", "error");
       }
@@ -295,7 +301,7 @@ function renderCategories(categories, errorMessage = "") {
             <td>${escapeHtml(displayName)}</td>
             <td><img src="${baseUrl + logoUrl}" alt="${escapeHtml(displayName)} Logo" width="50" height="50" /></td> <!-- Display logo -->
             <td class="remove">
-                <i class="fa-solid fa-trash trash" onclick="removeCategory(${id}, '${cat.category}', '${cat.shape_type}')" style="cursor:pointer;color:red;"></i>
+                <i class="fa-solid fa-trash trash" onclick="removeCategory(${id}, '${cat.category.replace(/'/g, "\\'")}', '${cat.shape_type}')" style="cursor:pointer;color:red;"></i>
             </td>
         `;
     tableBody.appendChild(row);
@@ -399,3 +405,28 @@ window.closeCustomAlert = function () {
   const overlay = document.getElementById("custom-alert-overlay");
   if (overlay) overlay.style.display = "none";
 };
+
+// Loading Indicator Helpers
+function showLoading(message = "Processing...") {
+  let overlay = document.getElementById("custom-loading-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "custom-loading-overlay";
+    overlay.className = "alert-overlay";
+    overlay.innerHTML = `
+      <div class="alert-box">
+        <div class="spinner-large"></div>
+        <div id="loading-message" class="alert-message"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  const msgEl = overlay.querySelector(".alert-message");
+  if (msgEl) msgEl.innerText = message;
+  overlay.style.display = "flex";
+}
+
+function hideLoading() {
+  const overlay = document.getElementById("custom-loading-overlay");
+  if (overlay) overlay.style.display = "none";
+}

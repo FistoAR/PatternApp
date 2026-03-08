@@ -1,3 +1,13 @@
+// Handle Logout
+const logoutBtn = document.querySelector(".logout_btn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    localStorage.clear(); // Clear all local storage as requested
+    window.location.href = "login.html";
+  });
+}
+
 const mainContent = document.getElementById("main-content");
 const sidebarLinks = {
   "category-link": "category.html",
@@ -55,7 +65,7 @@ function loadPage(page) {
   });
 
   const activeLink = Object.entries(sidebarLinks).find(
-    ([, path]) => path === page
+    ([, path]) => path === page,
   );
   if (activeLink) {
     const link = document.getElementById(activeLink[0]);

@@ -110,6 +110,22 @@
               </div>
             </div>
           </div>
+
+          <!-- Confirm Modal -->
+          <div id="confirmModal" class="modal">
+            <div class="modal-content" style="height: auto; width: 30vw; min-width: 300px; padding: 2vw;">
+              <div class="modal_header" style="height: auto; border-bottom: 0.1vw solid #eee; padding-bottom: 1vw; margin-bottom: 1vw;">
+                <h3 id="confirmTitle" style="margin: 0; font-size: 1.25vw;">Confirm Action</h3>
+              </div>
+              <div class="modal_body" style="height: auto; padding: 1.5vw 0; text-align: center; display: block;">
+                <p id="confirmMessage" style="font-size: 1vw; color: #333; margin: 0; line-height: 1.5;">Your edited pattern will be lost. Are you sure you want to switch models?</p>
+              </div>
+              <div class="modal_footer" style="height: auto; display: flex; justify-content: flex-end; gap: 1vw; margin-top: 1vw;">
+                <button id="confirmCancelBtn" class="save_btn" style="background-color: #f1f1f1; color: #333; box-shadow: none;">Cancel</button>
+                <button id="confirmOkBtn" class="save_btn">Confirm</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="main_content">
           <div class="model" id="modelcontainer">
@@ -123,13 +139,22 @@
                 padding: 0 1.5vw;
               "
             >
-              <!-- Left: Auto Apply Pattern -->
-              <div style="position: absolute; left: 1.5vw; display: flex; align-items: center; gap: 0.5vw;">
-                <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Apply Pattern</span>
-                <label class="rotate-switch">
-                  <input type="checkbox" id="autoApplyToggle" checked>
-                  <span class="rotate-slider"></span>
-                </label>
+              <!-- Left: Auto Apply Pattern & Hide Logo -->
+              <div style="position: absolute; left: 1.5vw; display: flex; align-items: center; gap: 1vw;">
+                <div style="display: flex; align-items: center; gap: 0.5vw;">
+                  <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Apply Pattern</span>
+                  <label class="rotate-switch">
+                    <input type="checkbox" id="autoApplyToggle" checked>
+                    <span class="rotate-slider"></span>
+                  </label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5vw;">
+                  <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Hide Logo</span>
+                  <label class="rotate-switch">
+                    <input type="checkbox" id="hideLogoToggle">
+                    <span class="rotate-slider"></span>
+                  </label>
+                </div>
               </div>
 
               <!-- Center: Model Name -->

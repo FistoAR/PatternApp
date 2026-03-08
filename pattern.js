@@ -12,6 +12,41 @@ let uploadTarget = { category: "", shape: "" };
 let allCategories = []; // Global storage for categories
 let pendingFiles = { primary: null, top: null };
 
+const MIN_DIMENSIONS = {
+  round: { primary: { w: 4153, h: 929 } },
+  "round square": { primary: { w: 2186, h: 563 } },
+  rectangle: { top: { w: 1074, h: 722 } },
+  "sweet box": { primary: { w: 5808, h: 420 }, top: { w: 856, h: 669 } },
+  "sweet box te": { primary: { w: 2927, h: 2361 }, top: { w: 1464, h: 1102 } },
+};
+
+function getImageDimensions(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.width, h: img.height });
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function validatePatternDimensions(file, type, shape) {
+  const s = (shape || "").toLowerCase().replace(/_/g, " ");
+  const req = MIN_DIMENSIONS[s]?.[type];
+  if (!req) return { valid: true };
+
+  const { w, h } = await getImageDimensions(file);
+  if (w < req.w || h < req.h) {
+    return {
+      valid: false,
+      error: `Minimum dimensions for ${s} ${type === "top" ? "Lid" : "Tub"} are ${req.w}x${req.h}. Your image is ${w}x${h}.`,
+    };
+  }
+  return { valid: true };
+}
+
 function initPatternPage() {
   const globalFileInput = document.getElementById("global-pattern-file");
   const shapeFilter = document.getElementById("shape-filter");
@@ -45,9 +80,89 @@ function initPatternPage() {
 
   // Global Quick Upload Trigger
   window.triggerQuickUpload = function (category, shape, el) {
-    uploadTarget = { category, shape, element: el };
-    openUploadModal(shape, category);
+    // If 'el' is the element (common in this app), try to use window.event to stop propagation
+    const ev = el && el.stopPropagation ? el : window.event;
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+
+    const catName = category || "";
+    const shapeName = shape || "";
+    uploadTarget = { category: catName, shape: shapeName, element: el };
+    openUploadModal(shapeName, catName);
   };
+
+  initPatternLightbox();
+}
+
+function initPatternLightbox() {
+  if (document.getElementById("pattern-lightbox")) return;
+  const lb = document.createElement("div");
+  lb.id = "pattern-lightbox";
+  lb.className = "pattern-lightbox";
+  lb.innerHTML = `
+    <div class="lightbox-overlay" onclick="closePatternLightbox()"></div>
+    <div id="lightbox-bg" class="lightbox-bg"></div>
+    <div class="lightbox-container">
+      <button class="lightbox-close" onclick="closePatternLightbox()"><i class="fa-solid fa-times"></i></button>
+      <div class="lightbox-content">
+        <img id="lightbox-img" src="" alt="Full Pattern">
+        <div id="lightbox-label" class="lightbox-label"></div>
+      </div>
+      <button id="lightbox-next-btn" class="lightbox-nav-btn next" onclick="toggleLightboxPattern(event)">
+        <span>Next</span> <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+  `;
+  document.body.appendChild(lb);
+}
+
+let currentLightboxData = { p: null, view: "tub" };
+
+window.openPatternLightbox = function (id, event) {
+  if (event) event.stopPropagation();
+  const p = loadedPatterns.find((pat) => pat.id == id);
+  if (!p) return;
+  currentLightboxData = { p: p, view: p.pattern_url_top ? "lid" : "tub" };
+  updateLightboxView();
+  const lb = document.getElementById("pattern-lightbox");
+  if (lb) lb.classList.add("active");
+};
+
+window.closePatternLightbox = function () {
+  document.getElementById("pattern-lightbox").classList.remove("active");
+};
+
+window.toggleLightboxPattern = function (event) {
+  if (event) event.stopPropagation();
+  const { p, view } = currentLightboxData;
+  if (!p.pattern_url || !p.pattern_url_top) return;
+  currentLightboxData.view = view === "tub" ? "lid" : "tub";
+  updateLightboxView();
+};
+
+function updateLightboxView() {
+  const { p, view } = currentLightboxData;
+  const imgEl = document.getElementById("lightbox-img");
+  const bgEl = document.getElementById("lightbox-bg");
+  const labelEl = document.getElementById("lightbox-label");
+  const nextBtn = document.getElementById("lightbox-next-btn");
+  const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
+
+  const fileName =
+    (view === "lid" ? p.pattern_url_top : p.pattern_url) ||
+    p.pattern_url_top ||
+    p.pattern_url;
+  const fullUrl = baseUrl + encodeURIComponent(fileName);
+
+  imgEl.src = fullUrl;
+  if (bgEl)
+    bgEl.style.backgroundImage = `url('${fullUrl.replace(/'/g, "\\'")}')`;
+  labelEl.textContent = view === "lid" ? "Lid Pattern" : "Tub Pattern";
+
+  if (p.pattern_url && p.pattern_url_top) {
+    nextBtn.style.display = "flex";
+  } else {
+    nextBtn.style.display = "none";
+  }
 }
 
 function openUploadModal(shape, category) {
@@ -154,6 +269,25 @@ async function handleModalSubmit() {
     return showAlert("Pattern is required.", "error");
   }
 
+  // Dimension Validation: Collect all errors
+  const sizeErrors = [];
+  if (pendingFiles.primary) {
+    const v = await validatePatternDimensions(
+      pendingFiles.primary,
+      "primary",
+      shape,
+    );
+    if (!v.valid) sizeErrors.push(v.error);
+  }
+  if (pendingFiles.top) {
+    const v = await validatePatternDimensions(pendingFiles.top, "top", shape);
+    if (!v.valid) sizeErrors.push(v.error);
+  }
+
+  if (sizeErrors.length > 0) {
+    return showAlert(sizeErrors.join("\n"), "error");
+  }
+
   submitBtn.disabled = true;
   submitBtn.textContent = "Saving...";
 
@@ -233,11 +367,33 @@ function updateCategoryFilterOptions() {
 }
 
 const SHAPE_TYPES = [
-  { id: "Round", label: "Round" },
-  { id: "Round Square", label: "Round Square" },
-  { id: "Rectangle", label: "Rectangle" },
-  { id: "Sweet Box", label: "Sweet Box" },
-  { id: "Sweet Box TE", label: "Sweet Box TE" },
+  {
+    id: "Round",
+    label: "Round",
+    image: "https://images.pexels.com/photos/4354699/pexels-photo-4354699.jpeg",
+  },
+  {
+    id: "Round Square",
+    label: "Round Square",
+    image:
+      "https://images.pexels.com/photos/13968287/pexels-photo-13968287.jpeg",
+  },
+  {
+    id: "Rectangle",
+    label: "Rectangle",
+    image: "https://images.pexels.com/photos/7190355/pexels-photo-7190355.jpeg",
+  },
+  {
+    id: "Sweet Box",
+    label: "Sweet Box",
+    image:
+      "https://images.pexels.com/photos/28769885/pexels-photo-28769885.jpeg",
+  },
+  {
+    id: "Sweet Box TE",
+    label: "Sweet Box TE",
+    image: "https://images.pexels.com/photos/4841368/pexels-photo-4841368.jpeg",
+  },
 ];
 
 function filterAndRenderGrid() {
@@ -282,8 +438,7 @@ function renderShapeSelectionGrid(container) {
     card.className = "shape-type-big-card";
     card.innerHTML = `
       <div class="shape-icon-container">
-        <!-- We can use a generic icon or a placeholder as per user request -->
-        <div class="shape-symbol-placeholder"></div>
+        <img src="${shape.image}" alt="${shape.label}" class="shape-type-img" onerror="this.src='https://via.placeholder.com/400x300?text=No+Image'">
       </div>
       <div class="shape-card-footer">
         <h3>${shape.label}</h3>
@@ -408,7 +563,28 @@ function renderPatternGrid(patterns, gridContainer) {
       filterAndRenderGrid();
     };
 
+    // Dimension Display
+    const sLower = selectedShape.toLowerCase().replace(/_/g, " ");
+    const dims = MIN_DIMENSIONS[sLower];
+    let dimStr = "";
+    if (dims) {
+      if (dims.primary && dims.top) {
+        dimStr = `Tub: ${dims.primary.w}×${dims.primary.h}, Lid: ${dims.top.w}×${dims.top.h}`;
+      } else if (dims.primary) {
+        dimStr = `${dims.primary.w}×${dims.primary.h}`;
+      } else if (dims.top) {
+        dimStr = `Lid: ${dims.top.w}×${dims.top.h}`;
+      }
+    }
+
+    const infoEl = document.createElement("div");
+    infoEl.className = "shape-dim-info";
+    infoEl.innerHTML = dimStr
+      ? `<span>Required Dimensions for ${selectedShape}:</span> <strong>${dimStr}</strong>`
+      : "";
+
     headerActions.appendChild(backBtn);
+    headerActions.appendChild(infoEl);
     gridContainer.appendChild(headerActions);
   }
 
@@ -470,46 +646,52 @@ function renderPatternGrid(patterns, gridContainer) {
             <span>${escapeHtml(cat.shape_type)}</span>
           </div>
         </div>
-        ${!isBigView ? `<button class="category-show-btn" onclick="window.viewCategoryDetails('${cat.shape_type}', '${cat.category}')">Show</button>` : ""}
+        ${!isBigView ? `<button class="category-show-btn" onclick="window.viewCategoryDetails('${cat.shape_type.replace(/'/g, "\\'")}', '${cat.category.replace(/'/g, "\\'")}')">Show</button>` : ""}
       </div>
       <div class="patterns-grid">
         <!-- Add Pattern Card -->
-        <div class="add-pattern-card" onclick="window.triggerQuickUpload('${cat.category}', '${cat.shape_type}', this)">
+        <div class="add-pattern-card" onclick="window.triggerQuickUpload('${cat.category.replace(/'/g, "\\'")}', '${cat.shape_type.replace(/'/g, "\\'")}', this)">
           <i class="fa-solid fa-upload"></i>
           <p><span>Upload</span></p>
         </div>
         <!-- List patterns -->
         ${showPatterns
-          .flatMap((p) => {
+          .map((p) => {
             const fileName = p.pattern_url || "";
             const fileNameTop = p.pattern_url_top || "";
             const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
-            const cards = [];
 
-            if (fileNameTop) {
-              cards.push(`
-                <div class="pattern-card">
-                  <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" alt="Pattern" onerror="this.src='';"/>
-                  <span class="dual-label top">Lid Pattern</span>
+            if (fileNameTop && fileName) {
+              return `
+                <div class="pattern-card dual" onclick="window.openPatternLightbox('${p.id}', event)">
+                  <div class="pattern-dual-images">
+                    <div class="dual-slot">
+                      <img src="${baseUrl}${encodeURIComponent(fileNameTop)}" alt="Lid" onerror="this.src='';"/>
+                      <span class="dual-label">Lid</span>
+                    </div>
+                    <div class="dual-slot">
+                      <img src="${baseUrl}${encodeURIComponent(fileName)}" alt="Tub" onerror="this.src='';"/>
+                      <span class="dual-label">Tub</span>
+                    </div>
+                  </div>
                   <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
                     <i class="fa-solid fa-times"></i>
                   </button>
                 </div>
-              `);
-            }
-
-            if (fileName) {
-              cards.push(`
-                <div class="pattern-card">
-                  <img src="${baseUrl}${encodeURIComponent(fileName)}" alt="Pattern" onerror="this.src='';"/>
-                  <span class="dual-label bottom">Tub Pattern</span>
+              `;
+            } else {
+              const imgFile = fileName || fileNameTop;
+              const label = fileNameTop ? "Lid Pattern" : "Tub Pattern";
+              return `
+                <div class="pattern-card" onclick="window.openPatternLightbox('${p.id}', event)">
+                  <img src="${baseUrl}${encodeURIComponent(imgFile)}" alt="Pattern" onerror="this.src='';"/>
+                  <span class="dual-label bottom">${label}</span>
                   <button class="remove-pattern-btn" title="Delete Pattern" data-id="${p.id}">
                     <i class="fa-solid fa-times"></i>
                   </button>
                 </div>
-              `);
+              `;
             }
-            return cards;
           })
           .join("")}
         ${
@@ -572,6 +754,11 @@ async function uploadPatternHandler() {
   if (!shapeType) return alert("Please select a shape type.");
   if (!file) return alert("Please select a pattern file.");
 
+  // Dimension Validation
+  const type = shapeType.toLowerCase() === "rectangle" ? "top" : "primary";
+  const v = await validatePatternDimensions(file, type, shapeType);
+  if (!v.valid) return alert(v.error);
+
   const ext = file.name.split(".").pop().toLowerCase();
   const allowed = ["jpg", "jpeg", "png", "gif", "webp"];
   if (!allowed.includes(ext)) return alert("Invalid file type.");
@@ -595,7 +782,7 @@ async function uploadPatternHandler() {
 
   if (result.status === "success") {
     alert("Pattern uploaded successfully");
-    const modal = document.getElementById("pattern-modal");
+    const modal = document.getElementById("upload-modal");
     if (modal) modal.style.display = "none";
 
     fileInput.value = "";
@@ -612,6 +799,7 @@ async function uploadPatternHandler() {
 }
 
 async function deletePattern(id) {
+  showLoading("Deleting pattern...");
   try {
     const res = await fetch(API_DELETE_PATTERNS, {
       method: "POST",
@@ -620,6 +808,7 @@ async function deletePattern(id) {
     });
 
     const data = await res.json();
+    hideLoading();
     if (data.status === "success") {
       showAlert("Pattern deleted successfully.");
       fetchPatterns();
@@ -630,7 +819,9 @@ async function deletePattern(id) {
       );
     }
   } catch (err) {
+    hideLoading();
     console.error("Delete error:", err);
+    showAlert("An error occurred while deleting the pattern.", "error");
   }
 }
 
@@ -723,6 +914,31 @@ window.closeCustomAlert = function () {
   const overlay = document.getElementById("custom-alert-overlay");
   if (overlay) overlay.style.display = "none";
 };
+
+// Loading Indicator Helpers
+function showLoading(message = "Processing...") {
+  let overlay = document.getElementById("custom-loading-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "custom-loading-overlay";
+    overlay.className = "alert-overlay";
+    overlay.innerHTML = `
+      <div class="alert-box">
+        <div class="spinner-large"></div>
+        <div id="loading-message" class="alert-message"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  const msgEl = overlay.querySelector(".alert-message");
+  if (msgEl) msgEl.innerText = message;
+  overlay.style.display = "flex";
+}
+
+function hideLoading() {
+  const overlay = document.getElementById("custom-loading-overlay");
+  if (overlay) overlay.style.display = "none";
+}
 
 // Initial call
 if (document.readyState === "loading") {

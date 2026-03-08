@@ -151,7 +151,7 @@ body {
 
 .model_view {
   flex: 1;
-  background: radial-gradient(circle, #f0f0f0 0%, #e0e0e0 100%);
+  background: #c7c7c7;
   border-radius: 1vw;
   box-shadow: inset 0 0 2vw rgba(0, 0, 0, 0.05);
   position: relative;
@@ -326,6 +326,20 @@ body {
   flex: 1;
   overflow-y: auto;
   padding-right: 0.5vw;
+  scroll-behavior: smooth;
+}
+
+.angle-models {
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+#angleCardContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8vw;
+  height: 100%;
 }
 
 /* Thin Scrollbar Styling */
@@ -360,9 +374,9 @@ body {
 .model-category-item {
   margin-bottom: 0.5vw;
   border-radius: 0.6vw;
-  overflow: hidden;
   border: 0.05vw solid #eee;
   background: white;
+  position: relative; /* Context for children */
 }
 
 .model-category-header {
@@ -390,6 +404,12 @@ body {
 .model-category-item.open .model-category-header {
   background: #dfab0c;
   color: white;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 0.2vw 0.5vw rgba(0,0,0,0.1);
+  border-top-left-radius: 0.6vw;
+  border-top-right-radius: 0.6vw;
 }
 
 .model-category-item.open .model-category-header i {
@@ -425,6 +445,9 @@ body {
   display: flex;
   padding: 0 1vw 1vw 1vw;
   gap: 1vw;
+  width: 100vw;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent the whole row from pushing the page width */
 }
 
 .export_logo, .model_input, .model_renders {
@@ -448,12 +471,16 @@ body {
 
 .model_renders {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  max-width: 55.5vw; /* Precisely covers screen with other boxes */
 }
 
 .custom-logo-upload, .input-section, .render_models {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Critical for scrollable children in flexbox */
 }
 
 .custom-logo-upload h4, .input-section h4, .render_models h4 {
@@ -515,7 +542,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 0.5vw;
+  gap: 0.2vw;
 }
 
 .model_input .input-section h4 {
@@ -580,7 +607,6 @@ body {
   display: flex;
   justify-content: flex-start;
   gap: 1.5vw;
-  margin-top: 0.2vw;
 }
 
 #textureUploadRow .input-group {
@@ -685,24 +711,76 @@ body {
   cursor: not-allowed;
 }
 
+.render_container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%; /* Force it to stay within the parent width */
+  background: #f8f9fa;
+  border-radius: 0.8vw;
+  overflow: hidden;
+  height: 12vw; /* Fixed height for the carousel area */
+  margin-top: 0.5vw;
+}
+
+.scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.5vw;
+  height: 2.5vw;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 0.3vw 1vw rgba(0, 0, 0, 0.2);
+  display: none; /* Controlled by JS */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1001; /* Stay on top of cards and containers */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #ff4d4d;
+  font-size: 1.25vw;
+  border: 0.05vw solid rgba(0, 0, 0, 0.05);
+  opacity: 1;
+  visibility: visible;
+}
+
+.scroll-btn i {
+  pointer-events: none;
+}
+
+.scroll-btn:hover {
+  background: #ff4d4d;
+  color: white;
+  box-shadow: 0 0.4vw 1.2vw rgba(255, 77, 77, 0.3);
+}
+
+.scroll-btn.left {
+  left: 0.8vw;
+}
+
+.scroll-btn.right {
+  right: 0.8vw;
+}
+
 #renderedImages {
   flex: 1;
+  height: 100%;
   display: flex;
-  gap: 1vw;
+  gap: 1.2vw;
   overflow-x: auto;
-  overflow-y: hidden; /* Strictly horizontal only */
-  padding: 0.8vw 1vw;
+  overflow-y: hidden;
+  padding: 1vw 1vw; /* Balanced padding for buttons */
   scroll-behavior: smooth;
-  align-items: stretch; /* Cards will fill height */
+  align-items: center;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  z-index: 5; /* Lower than buttons */
 }
 
 #renderedImages::-webkit-scrollbar {
-  height: 0.4vw;
-}
-
-#renderedImages::-webkit-scrollbar-thumb {
-  background: #ddd;
-  border-radius: 1vw;
+  display: none; /* Hide scrollbar for Chrome, Safari and Opera */
 }
 
 .rendered-card {
@@ -833,7 +911,7 @@ body {
   background: white;
   border: 0.1vw solid #eee;
   border-radius: 0.8vw;
-  padding: 0.5vw;
+  padding: 0.8vw;
   transition: var(--transition);
   display: flex;
   flex-direction: column;
@@ -841,7 +919,7 @@ body {
   justify-content: space-between;
   cursor: pointer;
   width: 100%;
-  height: 10vw;
+  height: 11vw;
   overflow: hidden; /* Prevent clipping issues on the container */
 }
 
@@ -854,6 +932,7 @@ body {
 .model-card-item model-viewer {
   width: 100%;
   height: 75%;
+  object-fit: contain;
 }
 
 .model-card-item div {
@@ -867,15 +946,17 @@ body {
   background: white;
   border: 0.1vw solid #eee;
   border-radius: 0.5vw;
-  padding: 0.5vw;
+  padding: 0.6vw;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition);
   cursor: pointer;
   width: 100%;
-  height: 5vw; /* Fixed height for consistency */
-  margin-bottom: 0.5vw;
+  flex: 1; /* Automatically stretch to fill container */
+  height: auto;
+  min-height: 0;
+  margin-bottom: 0;
   overflow: hidden;
 }
 
@@ -929,12 +1010,12 @@ body {
 
 /* Spinner Animation */
 .spinner {
-  width: 3vw;
-  height: 3vw;
-  border: 0.3vw solid rgba(255, 255, 255, 0.3);
-  border-top: 0.3vw solid white;
+  width: 4vw;
+  height: 4vw;
+  border: 0.4vw solid rgba(255, 255, 255, 0.1);
+  border-top: 0.4vw solid var(--accent-yellow);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 @keyframes spin {
@@ -945,7 +1026,8 @@ body {
 #pdfLoadingOverlay {
   position: fixed;
   inset: 0;
-  background: rgb(0, 0, 0);
+  background: rgba(0, 0, 0, 0.85); /* Slightly transparent black */
+  backdrop-filter: blur(10px);
   color: white;
   display: flex;
   flex-direction: column;
@@ -953,8 +1035,8 @@ body {
   justify-content: center;
   gap: 1.5vw;
   z-index: 9999;
-  font-size: 1.5vw;
-  font-weight: 500;
+  font-size: 1.2vw;
+  font-weight: 600;
   display: none;
 }
 

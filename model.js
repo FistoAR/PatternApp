@@ -100,7 +100,7 @@ const options = {
 /********** MATERIAL NAMES **********/
 const PATTERN_MATERIAL_NAME = ["tub_label"];
 const RECTANGLE_PATTERN_MATERIAL_NAME = ["lid_label"];
-const LOGO_MATERIAL_NAME = "Logo";
+const LOGO_MATERIAL_NAME = "logo";
 
 /********** PART MATERIAL NAMES **********/
 const PART_MATERIALS = {
@@ -174,8 +174,15 @@ function updateMaterialColor(part, color, { skipWait = false } = {}) {
         } else {
           // Reset for opaque colors
           mat.setEmissiveFactor([0, 0, 0]);
-          mat.pbrMetallicRoughness.setMetallicFactor(0.0);
-          mat.pbrMetallicRoughness.setRoughnessFactor(0.9);
+
+          // Premium White Effect: Metallic 1, Roughness 0.53
+          if (lowerColor === "white" || color.toLowerCase() === "#ffffff") {
+            mat.pbrMetallicRoughness.setMetallicFactor(1.0);
+            mat.pbrMetallicRoughness.setRoughnessFactor(0.53);
+          } else {
+            mat.pbrMetallicRoughness.setMetallicFactor(0.0);
+            mat.pbrMetallicRoughness.setRoughnessFactor(0.9);
+          }
         }
 
         // Apply transparency mode
@@ -403,8 +410,14 @@ const state = {
   isWithoutLogoModel: false,
   allPatterns: [],
   rawPatterns: [],
+  categories: [], // Store categories for sequential access
   currentShapeFilter: null,
   currentPatternType: null, // "top" or "bottom"
+  hideLogo: false, // track logo visibility
+  autoPatternIdx: 0, // NEW: Track the current index in the pattern cycle
+  isEdited: false, // Track if current pattern is a canvas edit
+  lastLibraryPatternUrl: null, // Store the last non-edited pattern
+  patternUrlTop: null, // Track lid pattern specifically
 };
 
 /********** ELEMENTS **********/
@@ -549,6 +562,9 @@ async function initModelAccordion() {
   // Open first category by default
   const firstHeader = modelAccordion.querySelector(".accordion-header");
   if (firstHeader) firstHeader.click();
+
+  // Load the first model to trigger default logic
+  selectModel(0);
 }
 
 function markSelectedThumbnail(index) {
@@ -558,7 +574,8 @@ function markSelectedThumbnail(index) {
 }
 
 // Filter Pattern Accordion based on Shape
-function filterPatternAccordion(shapeFilter) {
+// Filter Pattern Accordion based on Shape
+function filterPatternAccordion(shapeFilter, keepCycleIndex = false) {
   state.currentShapeFilter = shapeFilter;
   const accordion = document.getElementById("patternAccordion");
   if (!accordion) return;
@@ -641,16 +658,25 @@ function filterPatternAccordion(shapeFilter) {
     }
   });
 
-  // ✅ STRICT FILTERING for auto-cycle pool: Include both lid and tub URLs
+  // ✅ SEQUENTIAL FILTERING: Group pool patterns by Category order
   const pool = [];
-  state.rawPatterns.forEach((p) => {
-    const pShape = (p.shape_type || "").trim().toLowerCase();
-    if (!shapeFilter || pShape === shapeLower) {
-      const u1 = resolvePatternUrl(p.pattern_url);
-      const u2 = resolvePatternUrl(p.pattern_url_top);
-      if (u1) pool.push(u1);
-      if (u2) pool.push(u2);
-    }
+
+  // Iterate categories in order
+  state.categories.forEach((cat) => {
+    const catPatterns = state.rawPatterns.filter(
+      (p) => p.category_name.toLowerCase() === cat.category.toLowerCase(),
+    );
+
+    catPatterns.forEach((p) => {
+      const pShape = (p.shape_type || "").trim().toLowerCase();
+      // Only include if matches shape filter (or no filter)
+      if (!shapeFilter || pShape === shapeLower) {
+        const u1 = resolvePatternUrl(p.pattern_url);
+        const u2 = resolvePatternUrl(p.pattern_url_top);
+        if (u1) pool.push(u1);
+        if (u2) pool.push(u2);
+      }
+    });
   });
 
   state.allPatterns = [...new Set(pool)];
@@ -658,74 +684,109 @@ function filterPatternAccordion(shapeFilter) {
   // If auto-apply is on, restart the cycle with new pool
   const autoApplyToggle = document.getElementById("autoApplyToggle");
   if (autoApplyToggle && autoApplyToggle.checked) {
-    startPatternCycle(state.allPatterns, 2000);
+    startPatternCycle(state.allPatterns, 2000, keepCycleIndex);
   }
 }
 
 /********** MODEL SELECTION **********/
 async function selectModel(index) {
   if (index < 0 || index >= state.thumbnails.length) return;
+
+  // 🔄 REVERT CANVAS EDITS: If switching models, clear edited pattern and restore brand logo
+  if (state.isEdited) {
+    const confirmed = await showConfirmModal(
+      "Your edited pattern will be lost. Are you sure you want to switch models?",
+    );
+    if (!confirmed) return;
+
+    console.log(
+      "[CategorySwitch] Reverting edited pattern to last library pattern.",
+    );
+    state.patternUrl = state.lastLibraryPatternUrl;
+    state.isEdited = false;
+    state.hideLogo = false;
+
+    // Update UI toggle
+    const hideLogoToggle = document.getElementById("hideLogoToggle");
+    if (hideLogoToggle) hideLogoToggle.checked = false;
+
+    // Note: toggleLogoVisibility will be called inside the "load" listener below
+  }
+
   state.selectedIndex = index;
   markSelectedThumbnail(index);
   const selectedModel = state.thumbnails[index];
   if (!mainViewer) return;
 
-  mainViewer.src = encodeURI(selectedModel.path + "?" + Date.now());
+  const modelPath = encodeURI(selectedModel.path);
+  // Force reload if we just reverted an edit (to ensure clean reload even on same model)
+  if (mainViewer.src === modelPath) {
+    mainViewer.src =
+      modelPath + (modelPath.includes("?") ? "&" : "?") + "t=" + Date.now();
+  } else {
+    mainViewer.src = modelPath;
+  }
   mainViewer.alt = selectedModel.name;
   mainModelTitle.textContent = selectedModel.name;
 
-  // 🛑 STOP any running pattern cycle immediately to prevent it from setting state.patternUrl
-  stopPatternCycle(false);
-
-  // 🧹 CLEAN SLATE: Reset state when switching models to prevent texture "bleeding"
-  state.patternUrl = null;
-  state.logoDataUrl = null;
-
-  // Clear selection highlight in sidebar
-  document
-    .querySelectorAll(".pattern-swatch")
-    .forEach((sw) => sw.classList.remove("selected"));
-
-  // Update Select Pattern list - "Analyse" the model to find the correct pattern shape
-  let shapeFilter = selectedModel.shape; // default from category
-  const lowerName = selectedModel.name.toLowerCase();
+  // Only STOP pattern cycle if we switch to a completely different shape type
   const lowerCat = selectedModel.shape.toLowerCase().trim();
+  let shapeFilter = selectedModel.shape; // default from category
+  if (lowerCat === "round") shapeFilter = "Round";
+  else if (lowerCat === "round square") shapeFilter = "Round Square";
+  else if (lowerCat === "rectangle") shapeFilter = "Rectangle";
+  else if (lowerCat === "sweet box") shapeFilter = "Sweet Box";
+  else if (lowerCat === "sweet box te") shapeFilter = "Sweet Box TE";
 
-  if (lowerCat === "round") {
-    shapeFilter = "Round";
-  } else if (lowerCat === "round square") {
-    shapeFilter = "Round Square";
-  } else if (lowerCat === "rectangle") {
-    shapeFilter = "Rectangle";
-  } else if (lowerCat === "sweet box") {
-    shapeFilter = "Sweet Box";
-  } else if (lowerCat === "sweet box te") {
-    shapeFilter = "Sweet Box TE";
+  const typeChanged = state.currentShapeFilter !== shapeFilter;
+
+  if (typeChanged) {
+    console.log("[CategorySwitch] New type detected, resetting pattern logic.");
+    stopPatternCycle(false);
+    state.autoPatternIdx = 0;
+
+    // Reset pattern to 1st compatible if Auto Apply is OFF
+    const autoApplyToggle = document.getElementById("autoApplyToggle");
+    if (!autoApplyToggle || !autoApplyToggle.checked) {
+      state.patternUrl = null;
+    }
+  } else {
+    console.log("[CategorySwitch] Same type, continuing pattern sequence.");
   }
 
-  console.log(
-    `[Analyse] Model: ${selectedModel.name}, Category: ${selectedModel.shape} => Shape Filter: ${shapeFilter}`,
-  );
-  filterPatternAccordion(shapeFilter);
+  filterPatternAccordion(shapeFilter, !typeChanged);
 
   mainViewer.addEventListener(
     "load",
     async () => {
       const capturedIndex = index; // Protect against stale loads
       try {
-        // ✅ Wait for model to be available after 'load' fires
-        while (!mainViewer.model) {
-          await new Promise((r) => requestAnimationFrame(r));
+        // 🛑 If user selected a DIFFERENT model while this was loading, ABORT
+        if (state.selectedIndex !== capturedIndex) return;
+
+        // ✅ Only reset to default colors if we actually changed the model type
+        if (typeChanged || !state.selectedColors.lid) {
+          const s = shapeFilter.toLowerCase();
+          if (s.includes("sweet box")) {
+            state.selectedColors.lid = "white";
+            state.selectedColors.tub = "white";
+          } else {
+            // Round, Round Square, Rectangle
+            state.selectedColors.lid = "transparency";
+            state.selectedColors.tub = "white";
+          }
+
+          // Apply to the 3D model
+          updateMaterialColor("lid", state.selectedColors.lid, {
+            skipWait: true,
+          });
+          updateMaterialColor("tub", state.selectedColors.tub, {
+            skipWait: true,
+          });
         }
 
-        // 🛑 If user selected a DIFFERENT model while this was loading, ABORT
-        if (state.selectedIndex !== capturedIndex) {
-          console.warn(
-            "[Stale Load] Aborting application for older model index:",
-            capturedIndex,
-          );
-          return;
-        }
+        // Sync UI radio buttons
+        if (partSelect) updatePart(partSelect.value);
 
         // Apply current auto-rotate state smoothly
         const autoRotateToggle = document.getElementById("autoRotateToggle");
@@ -733,22 +794,14 @@ async function selectModel(index) {
           updateAutoRotateSmooth(autoRotateToggle.checked, true);
         }
 
+        // Apply logo visibility
+        toggleLogoVisibility(state.hideLogo);
+
         console.log("Model fully available:", selectedModel.name);
 
         // 🧹 RESET ALL MATERIALS on the new model first
-        const viewers = [mainViewer];
-        const materialsToClear = [
-          "Bottom",
-          "Top",
-          "Top_1",
-          "Logo",
-          "lid_label",
-          "tub_label",
-        ];
-        viewers.forEach((v) => {
-          materialsToClear.forEach((matName) => {
-            clearMaterialTexture(v, matName);
-          });
+        ["lid_label", "tub_label", "Logo"].forEach((matName) => {
+          clearMaterialTexture(mainViewer, matName);
         });
 
         // Material detection - prefer shape-based check
@@ -764,24 +817,29 @@ async function selectModel(index) {
         // Only apply if user hasn't switched to another model (redundant check for safety)
         if (state.selectedIndex !== capturedIndex) return;
 
-        // Auto-Apply logic: Ensure we have a compatible pattern for the new shape
-        if (
-          !state.patternUrl ||
-          (isRect && state.currentPatternType !== "top") ||
-          (!isRect && state.currentPatternType !== "bottom")
-        ) {
-          // Current pattern is missing or incompatible. Try to find the first compatible one.
-          const compatible = state.rawPatterns.find((p) => {
-            const pShape = getCanonicalShape(p.shape_type);
-            return pShape === curShape;
-          });
+        // Apply last pattern if it exists, otherwise find a default for the new shape
+        if (!state.patternUrl) {
+          let firstCompatible = null;
+          // ✅ Prioritize 1st Category 1st Pattern by following state.categories order
+          for (const cat of state.categories) {
+            const catPatterns = state.rawPatterns.filter(
+              (p) =>
+                p.category_name.toLowerCase() === cat.category.toLowerCase(),
+            );
+            firstCompatible = catPatterns.find(
+              (p) => getCanonicalShape(p.shape_type) === curShape,
+            );
+            if (firstCompatible) break;
+          }
 
-          if (compatible) {
+          if (firstCompatible) {
             const url = isRect
-              ? compatible.pattern_url_top
-              : compatible.pattern_url;
+              ? firstCompatible.pattern_url_top
+              : firstCompatible.pattern_url;
             if (url) {
               state.patternUrl = resolvePatternUrl(url);
+              state.lastLibraryPatternUrl = state.patternUrl;
+              state.patternUrlTop = isRect ? state.patternUrl : null;
               state.currentPatternType = isRect ? "top" : "bottom";
             }
           }
@@ -789,8 +847,9 @@ async function selectModel(index) {
 
         if (state.patternUrl) {
           await applyPatternToAll(state.patternUrl, {
-            forceReload: true,
             materialOverride: materialName,
+            patternUrlTop: state.patternUrlTop,
+            isEdited: state.isEdited,
           });
 
           // Update swatch selection
@@ -810,12 +869,7 @@ async function selectModel(index) {
 
           await Promise.all(
             viewers.map((v) =>
-              tryApplyMaterialTexture(
-                v,
-                LOGO_MATERIAL_NAME,
-                state.logoDataUrl,
-                { forceReload: true },
-              ),
+              tryApplyMaterialTexture(v, LOGO_MATERIAL_NAME, state.logoDataUrl),
             ),
           );
         }
@@ -872,6 +926,7 @@ async function initCategoryAccordion() {
 
   accordion.innerHTML = "";
   const categories = await fetchCategories();
+  state.categories = categories; // Store for global access
   const allPatternsData = await fetchAllPatterns();
   state.rawPatterns = allPatternsData;
 
@@ -952,8 +1007,14 @@ async function initCategoryAccordion() {
 
           sw.addEventListener("click", async () => {
             stopPatternCycle();
-            if (state.isWithoutLogoModel) {
-              const confirmed = confirm(
+
+            if (state.isEdited) {
+              const confirmed = await showConfirmModal(
+                "Your edited pattern will be lost. Are you sure you want to select a new library pattern?",
+              );
+              if (!confirmed) return;
+            } else if (state.isWithoutLogoModel) {
+              const confirmed = await showConfirmModal(
                 "Selecting a new pattern will remove your custom logo. Proceed?",
               );
               if (!confirmed) return;
@@ -996,8 +1057,14 @@ async function initCategoryAccordion() {
 
             sw.addEventListener("click", async () => {
               stopPatternCycle();
-              if (state.isWithoutLogoModel) {
-                const confirmed = confirm(
+
+              if (state.isEdited) {
+                const confirmed = await showConfirmModal(
+                  "Your edited pattern will be lost. Are you sure you want to select a new library pattern?",
+                );
+                if (!confirmed) return;
+              } else if (state.isWithoutLogoModel) {
+                const confirmed = await showConfirmModal(
                   "Selecting a new pattern will remove your custom logo. Proceed?",
                 );
                 if (!confirmed) return;
@@ -1090,12 +1157,16 @@ exportBtn.addEventListener("click", async () => {
   }
 });
 
-/********** PATTERN CYCLE (update this part) **********/
-function startPatternCycle(patternUrls = [], interval = 2000) {
+/********** PATTERN CYCLE **********/
+function startPatternCycle(
+  patternUrls = [],
+  interval = 2000,
+  keepIndex = false,
+) {
   stopPatternCycle(false);
   if (!patternUrls.length) return;
 
-  let idx = 0;
+  if (!keepIndex) state.autoPatternIdx = 0;
   let lastSelectedEl = null;
 
   state.patternCycleTimer = setInterval(() => {
@@ -1111,10 +1182,10 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
       state.allPatterns && state.allPatterns.length > 0
         ? state.allPatterns
         : patternUrls;
-    const patternUrl = pool[idx % pool.length];
+    const patternUrl = pool[state.autoPatternIdx % pool.length];
 
     if (!patternUrl) {
-      idx++;
+      state.autoPatternIdx++;
       return;
     }
 
@@ -1160,12 +1231,12 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
         const isTE = modelAlt.includes("te");
         if (typeFromSwatch === "top")
           targets = isTE
-            ? PATTERN_MATERIAL_NAME
-            : RECTANGLE_PATTERN_MATERIAL_NAME;
-        else if (typeFromSwatch === "bottom")
-          targets = isTE
             ? RECTANGLE_PATTERN_MATERIAL_NAME
-            : PATTERN_MATERIAL_NAME;
+            : RECTANGLE_PATTERN_MATERIAL_NAME;
+        // Both now use Lid for Top
+        else if (typeFromSwatch === "bottom")
+          targets = isTE ? PATTERN_MATERIAL_NAME : PATTERN_MATERIAL_NAME;
+        // Both now use Tub for Bottom
         else
           targets = [
             ...RECTANGLE_PATTERN_MATERIAL_NAME,
@@ -1184,14 +1255,8 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
           if (!pUrl) return;
           let matNames = [];
           if (isBox) {
-            if (pType === "top")
-              matNames = isTE
-                ? PATTERN_MATERIAL_NAME
-                : RECTANGLE_PATTERN_MATERIAL_NAME;
-            else if (pType === "bottom")
-              matNames = isTE
-                ? RECTANGLE_PATTERN_MATERIAL_NAME
-                : PATTERN_MATERIAL_NAME;
+            if (pType === "top") matNames = RECTANGLE_PATTERN_MATERIAL_NAME;
+            else if (pType === "bottom") matNames = PATTERN_MATERIAL_NAME;
           } else {
             matNames = isRectangleModel(modelAlt)
               ? RECTANGLE_PATTERN_MATERIAL_NAME
@@ -1243,12 +1308,22 @@ function startPatternCycle(patternUrls = [], interval = 2000) {
 
     if (lastSelectedEl && lastSelectedEl !== matched)
       lastSelectedEl.classList.remove("selected");
-    if (matched && !matched.classList.contains("selected"))
+    if (matched && !matched.classList.contains("selected")) {
       matched.classList.add("selected");
+
+      // ✅ AUTO-EXPAND CATEGORY: Ensure the category accordion is open
+      const parentLi = matched.closest("li");
+      const header = parentLi?.querySelector(".accordion-header");
+      if (header && !header.classList.contains("active")) {
+        header.click();
+      }
+    }
     lastSelectedEl = matched;
 
     state.patternUrl = cleanUrl;
-    idx++;
+    state.lastLibraryPatternUrl = cleanUrl;
+    state.isEdited = false;
+    state.autoPatternIdx++;
   }, interval);
 }
 
@@ -1309,12 +1384,27 @@ async function applyPatternToAll(
     materialOverride = null,
     patternUrlTop = null,
     isFullSet = false,
+    isEdited = false,
   } = {},
 ) {
   if (!patternUrl) return;
 
   const cleanSelectedUrl = patternUrl.split("?")[0];
   state.patternUrl = cleanSelectedUrl;
+  state.lastLibraryPatternUrl = isEdited
+    ? state.lastLibraryPatternUrl
+    : cleanSelectedUrl;
+  state.isEdited = isEdited;
+
+  // Track top pattern specifically for Rectangle/Sweet Box models
+  if (patternUrlTop) {
+    state.patternUrlTop = patternUrlTop.split("?")[0];
+  } else if (isRectangleModel(mainViewer.alt)) {
+    // If we only have one URL and it's a rectangle model, it's effectively the top/lid one
+    state.patternUrlTop = cleanSelectedUrl;
+  } else {
+    state.patternUrlTop = null;
+  }
 
   // Highlight swatch
   document.querySelectorAll(".pattern-swatch").forEach((sw) => {
@@ -1326,128 +1416,103 @@ async function applyPatternToAll(
     new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
   );
 
-  await Promise.all(
-    allViewers.map(async (viewer, i) => {
-      if (!viewer) return;
-      if (!viewer.model) {
-        await new Promise((resolve) =>
-          viewer.addEventListener("load", resolve, { once: true }),
-        );
+  const applyTask = async (viewer) => {
+    if (!viewer) return;
+    if (!viewer.model) {
+      await new Promise((resolve) =>
+        viewer.addEventListener("load", resolve, { once: true }),
+      );
+    }
+
+    // 1. Determine if this viewer should receive the pattern
+    let shouldApply = viewer === mainViewer;
+
+    if (!shouldApply && state.modelViewers && state.thumbnails) {
+      const idxInList = state.modelViewers.indexOf(viewer);
+      const thumb = state.thumbnails[idxInList];
+      if (
+        thumb &&
+        getCanonicalShape(thumb.shape) === state.currentShapeFilter
+      ) {
+        shouldApply = true;
       }
+    }
 
-      // 1. Determine if this viewer should receive the pattern
-      let shouldApply = viewer === mainViewer;
+    if (!shouldApply) return;
 
-      // If it's a thumbnail viewer, check its shape
-      if (!shouldApply && state.modelViewers && state.thumbnails) {
-        // Find logical index (excluding mainViewer if it's also in state.modelViewers)
-        const idxInList = state.modelViewers.indexOf(viewer);
-        const thumb = state.thumbnails[idxInList];
-        if (
-          thumb &&
-          getCanonicalShape(thumb.shape) === state.currentShapeFilter
-        ) {
-          shouldApply = true;
-        }
-      }
+    // 2. Determine material name(s) dynamically
+    const modelAlt = (viewer.alt || "").toLowerCase();
+    const isBox =
+      modelAlt.includes("sweet box") ||
+      modelAlt.includes("sweetbox") ||
+      modelAlt.includes("square");
 
-      // 2. Determine material name(s) dynamically for this model
-      const modelAlt = (viewer.alt || "").toLowerCase();
-      const isBox =
-        modelAlt.includes("sweet box") ||
-        modelAlt.includes("sweetbox") ||
-        modelAlt.includes("square");
+    let targets = [];
+    if (isBox) {
+      const isTE = modelAlt.includes("te");
+      if (state.currentPatternType === "top")
+        targets = RECTANGLE_PATTERN_MATERIAL_NAME;
+      else if (state.currentPatternType === "bottom")
+        targets = PATTERN_MATERIAL_NAME;
+      else
+        targets = [
+          ...RECTANGLE_PATTERN_MATERIAL_NAME,
+          ...PATTERN_MATERIAL_NAME,
+        ];
+    } else {
+      targets = isRectangleModel(modelAlt)
+        ? RECTANGLE_PATTERN_MATERIAL_NAME
+        : PATTERN_MATERIAL_NAME;
+    }
 
-      let targets = [];
+    const applyOne = async (pUrl, pType) => {
+      if (!pUrl) return;
+      const isTE = modelAlt.includes("te");
+      let matNames = [];
       if (isBox) {
-        const isTE = modelAlt.includes("te");
-        // Dual-label models: target the SPECIFIC label based on pattern type
-        if (state.currentPatternType === "top") {
-          targets = isTE
-            ? PATTERN_MATERIAL_NAME
-            : RECTANGLE_PATTERN_MATERIAL_NAME;
-        } else if (state.currentPatternType === "bottom") {
-          targets = isTE
+        matNames =
+          pType === "top"
             ? RECTANGLE_PATTERN_MATERIAL_NAME
             : PATTERN_MATERIAL_NAME;
-        } else {
-          // If type unknown, try to find either (first match wins in tryApplyMaterialTexture)
-          targets = [
-            ...RECTANGLE_PATTERN_MATERIAL_NAME,
-            ...PATTERN_MATERIAL_NAME,
-          ];
-        }
       } else {
-        // Single-label models: target their default label regardless of pattern "type"
-        // This ensures a "Top" pattern can still be applied to a "Round" model's tub_label.
-        targets = isRectangleModel(modelAlt)
+        matNames = isRectangleModel(modelAlt)
           ? RECTANGLE_PATTERN_MATERIAL_NAME
           : PATTERN_MATERIAL_NAME;
       }
+      let rot =
+        isBox &&
+        isTE &&
+        RECTANGLE_PATTERN_MATERIAL_NAME.some((n) => matNames.includes(n))
+          ? 90
+          : 0;
+      await tryApplyMaterialTexture(viewer, matNames, pUrl, {
+        skipWait: true,
+        rotation: rot,
+      });
+    };
 
-      if (shouldApply) {
-        // Apply pattern(s)
-        const applyOne = async (pUrl, pType) => {
-          if (!pUrl) return;
-          const isTE = modelAlt.includes("te");
-          let matNames = [];
+    if (patternUrlTop) {
+      await Promise.all([
+        applyOne(patternUrl, "bottom"),
+        applyOne(patternUrlTop, "top"),
+      ]);
+    } else if (sw && sw.dataset.patternType === "full") {
+      await Promise.all([
+        applyOne(sw.dataset.patternUrl, "bottom"),
+        applyOne(sw.dataset.patternUrlTop, "top"),
+      ]);
+    } else {
+      await applyOne(patternUrl, state.currentPatternType || "bottom");
+    }
+  };
 
-          if (isBox) {
-            if (pType === "top")
-              matNames = isTE
-                ? PATTERN_MATERIAL_NAME
-                : RECTANGLE_PATTERN_MATERIAL_NAME;
-            else if (pType === "bottom")
-              matNames = isTE
-                ? RECTANGLE_PATTERN_MATERIAL_NAME
-                : PATTERN_MATERIAL_NAME;
-          } else {
-            matNames = isRectangleModel(modelAlt)
-              ? RECTANGLE_PATTERN_MATERIAL_NAME
-              : PATTERN_MATERIAL_NAME;
-          }
+  // 🚀 Start main viewer immediately and AWAIT it
+  await applyTask(mainViewer);
 
-          // Fix orientation for Sweet Box TE lid_label
-          let finalRotation = 0;
-          const isLidMat = RECTANGLE_PATTERN_MATERIAL_NAME.some((n) =>
-            matNames.includes(n),
-          );
-
-          if (isBox && isTE && isLidMat) {
-            finalRotation = 90;
-          }
-
-          await tryApplyMaterialTexture(viewer, matNames, pUrl, {
-            skipWait: true,
-            forceReload,
-            rotation: finalRotation,
-          });
-        };
-
-        if (isFullSet && patternUrlTop) {
-          // Both together
-          await Promise.all([
-            applyOne(patternUrl, "bottom"),
-            applyOne(patternUrlTop, "top"),
-          ]);
-        } else {
-          // Single application (determined by type attribute of swatch if available)
-          const swatch = Array.from(
-            document.querySelectorAll(".pattern-swatch"),
-          ).find((s) => s.dataset.patternUrl === patternUrl);
-          const type =
-            swatch?.dataset.patternType ||
-            (isRectangleModel(modelAlt) ? "top" : "bottom");
-          await applyOne(patternUrl, type);
-        }
-      } else {
-        // Clear pattern if model is incompatible
-        for (const matName of targets) {
-          clearMaterialTexture(viewer, matName);
-        }
-      }
-    }),
-  );
+  // Background the rest
+  allViewers
+    .filter((v) => v !== mainViewer)
+    .forEach((v) => applyTask(v).catch(() => {}));
 }
 
 /********** CREATE LOGO CANVAS WITHOUT STRETCH **********/
@@ -1504,12 +1569,20 @@ async function tryApplyMaterialTexture(
     );
   }
 
-  const names = Array.isArray(materialNames) ? materialNames : [materialNames];
+  const names = (
+    Array.isArray(materialNames) ? materialNames : [materialNames]
+  ).map((n) => n.toLowerCase());
   const matchingMaterials = (viewer.model?.materials || []).filter((m) =>
-    names.includes(m.name),
+    names.includes(m.name.toLowerCase()),
   );
 
-  if (matchingMaterials.length === 0) return;
+  if (matchingMaterials.length === 0) {
+    console.warn(
+      `[tryApplyMaterialTexture] No matching materials found for:`,
+      materialNames,
+    );
+    return;
+  }
 
   try {
     let vcache = viewerTextureCache.get(viewer);
@@ -1642,7 +1715,7 @@ function updatePickrBorderColor(hexColor) {
 const pickr = Pickr.create({
   el: "#bgColorPicker",
   theme: "nano",
-  default: "#fbb4ffff",
+  default: "#c7c7c7ff",
   components: {
     preview: true,
     opacity: true,
@@ -1656,7 +1729,7 @@ const pickr = Pickr.create({
 
 // Restore saved color on init
 pickr.on("init", () => {
-  const savedColor = localStorage.getItem("bgColor") || "#ffffffff";
+  const savedColor = localStorage.getItem("bgColor") || "#c7c7c7ff";
   applyColor(savedColor);
   pickr.setColor(savedColor);
   updatePickrBorderColor(savedColor);
@@ -1803,11 +1876,17 @@ function initFabricCanvas() {
 
   resizeCanvas();
 
-  if (state.patternUrl) {
+  // For Rectangle/Sweet Box models, prioritize the Top (Lid) pattern for editing
+  const modelName = mainViewer.alt || "";
+  const editUrl = isRectangleModel(modelName)
+    ? state.patternUrlTop || state.patternUrl
+    : state.patternUrl;
+
+  if (editUrl) {
     previewLoader.style.display = "block"; // show loader before base image loads
 
     fabric.Image.fromURL(
-      state.patternUrl + "?t=" + Date.now(),
+      editUrl + "?t=" + Date.now(),
       (img) => {
         baseImageObj = img;
 
@@ -1937,25 +2016,38 @@ function getModelWithoutLogoPath(selectedIndex) {
   const selectedModelName = state.thumbnails[selectedIndex]?.name;
   if (!selectedModelName) return null;
 
-  // Search in regular without logo categories
   for (const models of Object.values(MODEL_CATEGORIES_WITHOUT_LOGO)) {
     const found = models.find((m) => m.name === selectedModelName);
     if (found) return found.path;
   }
-
-  // Search also inside rectangle without logo categories
   for (const models of Object.values(RECTANGLE_MODEL_CATEGORIES_WITHOUT_LOGO)) {
     const found = models.find((m) => m.name === selectedModelName);
     if (found) return found.path;
   }
+  return null;
+}
 
+function getWithLogoModelPathByName(name) {
+  if (!name) return null;
+  for (const models of Object.values(MODEL_CATEGORIES)) {
+    const found = models.find((m) => m.name === name);
+    if (found) return found.path;
+  }
+  for (const models of Object.values(Rectangle_MODEL_CATEGORIES)) {
+    const found = models.find((m) => m.name === name);
+    if (found) return found.path;
+  }
   return null;
 }
 
 // Open modal and initialize everything
-editBtn.addEventListener("click", () => {
+editBtn.addEventListener("click", async () => {
   if (state.patternCycleTimer) {
-    alert("Please select the pattern before editing.");
+    await showConfirmModal(
+      "Please select the pattern before editing.",
+      "Pattern Required",
+      true,
+    );
     return;
   }
 
@@ -2018,6 +2110,7 @@ uploadInput.addEventListener("change", (event) => {
     state.logoDataUrl = dataUrl;
 
     addLogoToCanvas(dataUrl);
+    toggleLogoVisibility(state.hideLogo); // Ensure it shows if toggle is off
 
     previewLoader.style.display = "none";
   };
@@ -2033,21 +2126,6 @@ if (closeModal) {
     const selectedModelName = state.thumbnails[currentIndex]?.name;
 
     if (!selectedModelName || !mainViewer) return;
-
-    // Function to find WITH logo path by name in categories
-    function getWithLogoModelPathByName(name) {
-      // Search in regular model categories
-      for (const models of Object.values(MODEL_CATEGORIES)) {
-        const found = models.find((m) => m.name === name);
-        if (found) return found.path;
-      }
-      // Search in rectangle model categories
-      for (const models of Object.values(Rectangle_MODEL_CATEGORIES)) {
-        const found = models.find((m) => m.name === name);
-        if (found) return found.path;
-      }
-      return null;
-    }
 
     // Determine the model path to restore (WITH logo)
     let pathWithLogo = null;
@@ -2135,26 +2213,68 @@ saveLogoBtn.addEventListener("click", async () => {
     multiplier: baseImageObj.width / canvas.getWidth(),
   });
 
-  // Helper to apply pattern based on model type (rectangle vs round)
-  async function applyPatternBasedOnModelType(viewer, textureUrl) {
-    if (!viewer || !textureUrl) return;
+  // ✅ RESTORE "WITH LOGO" model but HIDE the logo physically
+  const selectedModelName = state.thumbnails[state.selectedIndex]?.name;
+  const pathWithLogo = getWithLogoModelPathByName(selectedModelName);
 
-    const modelName = viewer.alt || "";
-    const isRect = isRectangleModel(modelName);
+  if (pathWithLogo && mainViewer) {
+    const encoded =
+      encodeURI(pathWithLogo) +
+      (pathWithLogo.includes("?") ? "&" : "?") +
+      "t=" +
+      Date.now();
 
-    if (isRect) {
-      await tryApplyMaterialTexture(
-        viewer,
-        RECTANGLE_PATTERN_MATERIAL_NAME,
-        textureUrl,
-      ); // Apply on "Top_1"
-    } else {
-      await tryApplyMaterialTexture(viewer, PATTERN_MATERIAL_NAME, textureUrl); // Apply on "Bottom"
-    }
+    mainViewer.addEventListener(
+      "load",
+      async () => {
+        // 1. Hide the baked-in brand logo
+        state.hideLogo = true;
+        const hideLogoToggle = document.getElementById("hideLogoToggle");
+        if (hideLogoToggle) hideLogoToggle.checked = true;
+        toggleLogoVisibility(true);
+
+        // 2. Apply patterns (re-applying both lid and tub to ensure nothing is lost)
+        const isRect = isRectangleModel(mainViewer.alt);
+        if (isRect) {
+          state.patternUrlTop = dataUrl;
+        } else {
+          state.patternUrl = dataUrl;
+        }
+        state.isEdited = true;
+
+        await applyPatternToAll(state.patternUrl, {
+          patternUrlTop: state.patternUrlTop,
+          isEdited: true,
+          forceReload: true,
+        });
+
+        // 3. Restore colors
+        Object.entries(state.selectedColors).forEach(([part, color]) => {
+          updateMaterialColor(part, color, { skipWait: true });
+        });
+
+        state.isWithoutLogoModel = false;
+      },
+      { once: true },
+    );
+
+    mainViewer.src = encoded;
+  } else {
+    console.error(
+      "[Save] Could not find with-logo path for:",
+      selectedModelName,
+    );
+    // Fallback: Apply to current model directly
+    const matName = isRectangleModel(mainViewer.alt)
+      ? RECTANGLE_PATTERN_MATERIAL_NAME
+      : PATTERN_MATERIAL_NAME;
+    state.patternUrl = dataUrl;
+    state.isEdited = true;
+    await tryApplyMaterialTexture(mainViewer, matName, dataUrl, {
+      forceReload: true,
+    });
+    state.hideLogo = true;
   }
-
-  // Apply pattern/logo texture to mainViewer conditionally
-  await applyPatternBasedOnModelType(mainViewer, dataUrl);
 
   // Modal and UI cleanup
   modal.classList.remove("show");
@@ -2174,7 +2294,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (saved) {
     state.selectedColors = JSON.parse(saved);
   } else {
-    state.selectedColors = { lid: "white", tub: "white" };
+    // Keep empty to let shape-based defaults apply on first load
+    state.selectedColors = {};
   }
 
   // ✅ Wait for thumbnails and categories to load
@@ -2212,14 +2333,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Auto Apply Toggle Logic
   const autoApplyToggle = document.getElementById("autoApplyToggle");
   if (autoApplyToggle) {
-    autoApplyToggle.addEventListener("change", (e) => {
+    autoApplyToggle.addEventListener("change", async (e) => {
       if (e.target.checked) {
+        if (state.isEdited) {
+          const confirmed = await showConfirmModal(
+            "Enabling Auto Apply will replace your edited pattern. Proceed?",
+          );
+          if (!confirmed) {
+            e.target.checked = false;
+            return;
+          }
+        }
         if (state.allPatterns && state.allPatterns.length > 0) {
           startPatternCycle(state.allPatterns, 2000);
         }
       } else {
         stopPatternCycle();
       }
+    });
+  }
+
+  // Hide Logo Toggle Logic
+  const hideLogoToggle = document.getElementById("hideLogoToggle");
+  if (hideLogoToggle) {
+    hideLogoToggle.addEventListener("change", (e) => {
+      state.hideLogo = e.target.checked;
+      toggleLogoVisibility(state.hideLogo);
     });
   }
 
@@ -2243,6 +2382,84 @@ document.addEventListener("DOMContentLoaded", async () => {
     preloader.classList.add("fade-out");
     setTimeout(() => {
       preloader.style.display = "none";
-    }, 500); // Optional fade-out
+    }, 500);
   }
 });
+
+function toggleLogoVisibility(hide) {
+  const viewers = Array.from(
+    new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
+  );
+  viewers.forEach((viewer) => {
+    if (!viewer || !viewer.model) return;
+
+    // Find ALL materials that contain "logo" just to be safe
+    const logoMaterials = viewer.model.materials.filter(
+      (m) =>
+        m.name.toLowerCase().includes("logo") ||
+        m.name.toLowerCase() === LOGO_MATERIAL_NAME.toLowerCase(),
+    );
+
+    logoMaterials.forEach((logoMat) => {
+      // Force BLEND mode to support transparency and avoid black quads
+      logoMat.setAlphaMode("BLEND");
+
+      if (hide) {
+        // Transparent
+        logoMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
+      } else {
+        // Fully visible + White factor (preserves original texture colors)
+        logoMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+      }
+    });
+  });
+}
+
+/********** CUSTOM CONFIRM MODAL **********/
+function showConfirmModal(
+  message = "",
+  title = "Confirm Action",
+  hideCancel = false,
+) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirmModal");
+    const titleEl = document.getElementById("confirmTitle");
+    const messageEl = document.getElementById("confirmMessage");
+    const okBtn = document.getElementById("confirmOkBtn");
+    const cancelBtn = document.getElementById("confirmCancelBtn");
+
+    if (!modal || !okBtn || !cancelBtn) {
+      resolve(confirm(message));
+      return;
+    }
+
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+
+    // Control and reset buttons
+    okBtn.textContent = "OK";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.style.display = hideCancel ? "none" : "flex";
+
+    modal.classList.add("show");
+
+    const onOk = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const cleanup = () => {
+      modal.classList.remove("show");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+    };
+
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
+}
