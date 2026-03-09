@@ -187,7 +187,11 @@ function openUploadModal(shape, category) {
   const shapeLower = (shape || "").toLowerCase().replace(/_/g, " ");
   title.textContent = `Upload Patterns for ${category}`;
 
-  if (shapeLower === "sweet box" || shapeLower === "sweet box te") {
+  if (
+    shapeLower === "sweet box" ||
+    shapeLower === "sweet box te" ||
+    shapeLower === "sweet box tamper evident"
+  ) {
     slotPrimary.style.display = "flex";
     slotTop.style.display = "flex";
     labelPrimary.textContent = "Tub Pattern";
