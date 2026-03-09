@@ -2181,17 +2181,18 @@ if (closeModal) {
     mainViewer.addEventListener(
       "load",
       async () => {
-        if (state.patternUrl) {
-          const isRect = isRectangleModel(mainViewer.alt || "");
-          const matName = isRect
-            ? RECTANGLE_PATTERN_MATERIAL_NAME
-            : PATTERN_MATERIAL_NAME;
+        const isRect = isRectangleModel(mainViewer.alt || "");
 
-          await tryApplyMaterialTexture(mainViewer, matName, state.patternUrl, {
+        // 1. Restore patterns (both lid and tub)
+        if (state.patternUrl) {
+          await applyPatternToAll(state.patternUrl, {
+            patternUrlTop: state.patternUrlTop,
             forceReload: true,
+            isEdited: state.isEdited,
           });
         }
 
+        // 2. Restore custom logo if it existed
         if (state.logoDataUrl) {
           await tryApplyMaterialTexture(
             mainViewer,
@@ -2199,6 +2200,10 @@ if (closeModal) {
             state.logoDataUrl,
           );
         }
+
+        // 3. Restore brand logo visibility and colors
+        toggleLogoVisibility(state.hideLogo);
+
         Object.entries(state.selectedColors).forEach(([part, color]) => {
           updateMaterialColor(part, color, { skipWait: true });
         });
@@ -2211,7 +2216,6 @@ if (closeModal) {
     mainViewer.src = encoded;
 
     if (canvas) {
-      // Remove logo if present
       if (logoImageObj) {
         canvas.remove(logoImageObj);
         logoImageObj = null;
@@ -2221,10 +2225,8 @@ if (closeModal) {
       baseImageObj = null;
     }
 
-    // Clear state
+    // Clear session-level logo data
     state.logoDataUrl = null;
-
-    // Optionally clear file input
     uploadInput.value = "";
   });
 }
