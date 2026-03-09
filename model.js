@@ -417,6 +417,8 @@ const state = {
   autoPatternIdx: 0, // NEW: Track the current index in the pattern cycle
   isEdited: false, // Track if current pattern is a canvas edit
   lastLibraryPatternUrl: null, // Store the last non-edited pattern
+  lastLibraryPatternUrlTop: null, // Store the last non-edited pattern for Rectangle Lid
+  lastLogoState: null, // Stores {dataUrl, left, top, scaleX, scaleY, angle}
   patternUrlTop: null, // Track lid pattern specifically
 };
 
@@ -728,6 +730,8 @@ async function selectModel(index) {
     state.patternUrl = state.lastLibraryPatternUrl;
     state.isEdited = false;
     state.hideLogo = false;
+    state.logoDataUrl = null;
+    state.lastLogoState = null;
 
     // Update UI toggle
     const hideLogoToggle = document.getElementById("hideLogoToggle");
@@ -823,6 +827,10 @@ async function selectModel(index) {
 
         // Apply logo visibility
         toggleLogoVisibility(state.hideLogo);
+
+        // Ensure zoom out is allowed (override any restrictive defaults)
+        mainViewer.setAttribute("max-camera-orbit", "auto auto 0.95m");
+        mainViewer.setAttribute("min-camera-orbit", "auto auto 0.25m");
 
         console.log("Model fully available:", selectedModel.name);
 
@@ -1358,7 +1366,6 @@ function hideExportOverlay() {
 
 exportBtn.addEventListener("click", async () => {
   const format = exportFormat.value;
-  const modelName = mainModelTitle.textContent.trim().replace(/\s+/g, "_");
 
   if (!mainViewer) return;
 
@@ -1372,7 +1379,16 @@ exportBtn.addEventListener("click", async () => {
     const UHD_W = 3840;
     const UHD_H = 2160;
 
+    // Wait 3 seconds so the loading screen is fully visible before capture starts
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
     const { rawDataUrl, bgRaw } = await captureUHDImage();
+
+    // Generate a clean filename: replace spaces with underscores and remove non-alphanumeric chars
+    const modelName = mainModelTitle.textContent
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "");
 
     if (format === "pdf") {
       // ── PDF: embed UHD image into a 3840×2160 pt page ───────────────────
@@ -1393,7 +1409,7 @@ exportBtn.addEventListener("click", async () => {
         format: [mmW, mmH],
       });
       pdf.addImage(composited, "PNG", 0, 0, mmW, mmH, "", "FAST");
-      pdf.save(`${modelName}.pdf`);
+      pdf.save(`${modelName}_Mockup.pdf`);
     } else if (format === "jpg") {
       // ── JPG: composite background then re-encode as JPEG for max quality ──
       const composited = await compositeWithBackground(
@@ -1673,17 +1689,26 @@ async function applyPatternToAll(
   state.lastLibraryPatternUrl = isEdited
     ? state.lastLibraryPatternUrl
     : cleanSelectedUrl;
-  state.isEdited = isEdited;
 
   // Track top pattern specifically for Rectangle/Sweet Box models
   if (patternUrlTop) {
-    state.patternUrlTop = patternUrlTop.split("?")[0];
+    const cleanTop = patternUrlTop.split("?")[0];
+    state.patternUrlTop = cleanTop;
+    if (!isEdited) state.lastLibraryPatternUrlTop = cleanTop;
   } else if (isRectangleModel(mainViewer.alt)) {
-    // If we only have one URL and it's a rectangle model, it's effectively the top/lid one
     state.patternUrlTop = cleanSelectedUrl;
+    if (!isEdited) state.lastLibraryPatternUrlTop = cleanSelectedUrl;
   } else {
     state.patternUrlTop = null;
+    if (!isEdited) state.lastLibraryPatternUrlTop = null;
   }
+
+  // Clear last logo state if we are applying a NEW library pattern
+  if (!isEdited) {
+    state.lastLogoState = null;
+  }
+
+  state.isEdited = isEdited;
 
   // Highlight swatch
   document.querySelectorAll(".pattern-swatch").forEach((sw) => {
@@ -2115,24 +2140,53 @@ function getBaseImageBounds() {
 
 const fabricCanvasElem = document.getElementById("fabricCanvas");
 
-// Resize canvas to fit wrapper size
+// Resize canvas to fit wrapper size while maintaining aspect ratio if image exists
 function resizeCanvas() {
-  const container = document.getElementById("model_body"); // your target element
-
+  const container = document.getElementById("model_body");
   if (!container) {
     console.warn("model_body not found!");
     return;
   }
 
-  const width = container.clientWidth;
-  const height = container.clientHeight;
+  const contW = container.clientWidth;
+  const contH = container.clientHeight;
 
-  fabricCanvasElem.width = width;
-  fabricCanvasElem.height = height;
+  let finalW = contW;
+  let finalH = contH;
+
+  // If a pattern is loaded, calculate dimensions to fit while preserving aspect ratio
+  if (baseImageObj) {
+    const imgAspect = baseImageObj.width / baseImageObj.height;
+    const contAspect = contW / contH;
+
+    if (imgAspect > contAspect) {
+      // Image is wider than container aspect
+      finalW = contW;
+      finalH = contW / imgAspect;
+    } else {
+      // Image is taller than container aspect
+      finalH = contH;
+      finalW = contH * imgAspect;
+    }
+  }
+
+  fabricCanvasElem.width = finalW;
+  fabricCanvasElem.height = finalH;
 
   if (canvas) {
-    canvas.setWidth(width);
-    canvas.setHeight(height);
+    canvas.setWidth(finalW);
+    canvas.setHeight(finalH);
+
+    // Update base image scaling and position to match new canvas size
+    if (baseImageObj) {
+      baseImageObj.set({
+        scaleX: finalW / baseImageObj.width,
+        scaleY: finalH / baseImageObj.height,
+        left: finalW / 2,
+        top: finalH / 2,
+      });
+    }
+
     canvas.renderAll();
   }
 }
@@ -2148,13 +2202,19 @@ function initFabricCanvas() {
     preserveObjectStacking: true,
   });
 
-  resizeCanvas();
-
-  // For Rectangle/Sweet Box models, prioritize the Top (Lid) pattern for editing
+  // Choose the background pattern: If edited before, use the original library pattern
   const modelName = mainViewer.alt || "";
-  const editUrl = isRectangleModel(modelName)
-    ? state.patternUrlTop || state.patternUrl
-    : state.patternUrl;
+  let editUrl = null;
+
+  if (state.isEdited) {
+    editUrl = isRectangleModel(modelName)
+      ? state.lastLibraryPatternUrlTop || state.lastLibraryPatternUrl
+      : state.lastLibraryPatternUrl;
+  } else {
+    editUrl = isRectangleModel(modelName)
+      ? state.patternUrlTop || state.patternUrl
+      : state.patternUrl;
+  }
 
   if (editUrl) {
     previewLoader.style.display = "block"; // show loader before base image loads
@@ -2164,19 +2224,59 @@ function initFabricCanvas() {
       (img) => {
         baseImageObj = img;
 
-        // Scale image to exactly fit canvas width and height (may stretch)
+        // Set non-geometric properties first
         img.set({
-          scaleX: canvas.width / img.width,
-          scaleY: canvas.height / img.height,
           selectable: false,
           evented: false,
-          left: canvas.width / 2,
-          top: canvas.height / 2,
           originX: "center",
           originY: "center",
         });
 
+        // Trigger resize with the now-known image properties
+        resizeCanvas();
+
         canvas.setBackgroundImage(img, () => {
+          // RESTORE LOGO IF IT EXISTS (Prioritize saved state over session logo)
+          if (state.lastLogoState && state.logoDataUrl) {
+            fabric.Image.fromURL(
+              state.logoDataUrl,
+              (logoImg) => {
+                logoImageObj = logoImg;
+
+                // Calculate absolute values from proportional factors
+                const finalScale =
+                  state.lastLogoState.scaleFactor * canvas.width;
+                const finalLeft = state.lastLogoState.leftFactor * canvas.width;
+                const finalTop = state.lastLogoState.topFactor * canvas.height;
+
+                logoImg.set({
+                  left: finalLeft,
+                  top: finalTop,
+                  scaleX: finalScale,
+                  scaleY: finalScale,
+                  angle: state.lastLogoState.angle,
+                  originX: "left",
+                  originY: "top",
+                  cornerStyle: "circle",
+                  cornerColor: "yellow",
+                  transparentCorners: false,
+                  lockScalingFlip: true,
+                  selectable: true,
+                  hasRotatingPoint: true,
+                  cornerSize: 12,
+                  minScaleLimit: 0.1,
+                });
+                canvas.add(logoImg);
+                canvas.setActiveObject(logoImg);
+                canvas.renderAll();
+              },
+              { crossOrigin: "anonymous" },
+            );
+          } else if (state.logoDataUrl) {
+            // First time editing with a logo already uploaded
+            addLogoToCanvas(state.logoDataUrl);
+          }
+
           canvas.renderAll();
           previewLoader.style.display = "none";
         });
@@ -2184,7 +2284,8 @@ function initFabricCanvas() {
       { crossOrigin: "anonymous" },
     );
   } else {
-    previewLoader.style.display = "none"; // no base image, hide loader immediately
+    resizeCanvas(); // Fallback for no pattern
+    previewLoader.style.display = "none";
   }
 }
 
@@ -2317,7 +2418,7 @@ editBtn.addEventListener("click", async () => {
     return;
   }
 
-  state.logoDataUrl = null;
+  // NOTE: do not clear logoDataUrl here, we want it to potentially persist or be restored via lastLogoState
 
   // Get "without logo" model path based on current selection
   const withoutLogoPath = getModelWithoutLogoPath(state.selectedIndex);
@@ -2349,11 +2450,6 @@ editBtn.addEventListener("click", async () => {
   previewLoader.style.display = "block"; // show loader immediately
 
   initFabricCanvas();
-
-  // If logo uploaded, add logo asynchronously (no loader wait)
-  if (state.logoDataUrl) {
-    addLogoToCanvas(state.logoDataUrl);
-  }
 });
 
 // Upload logo and add to canvas
@@ -2461,7 +2557,6 @@ if (closeModal) {
     }
 
     // Clear session-level logo data
-    state.logoDataUrl = null;
     uploadInput.value = "";
   });
 }
@@ -2480,6 +2575,19 @@ saveLogoBtn.addEventListener("click", async () => {
     quality: 1.0,
     multiplier: baseImageObj.width / canvas.getWidth(),
   });
+
+  // Save the state of the logo so it can be re-edited later
+  // Save the state of the logo relative to canvas size
+  if (logoImageObj) {
+    state.lastLogoState = {
+      leftFactor: logoImageObj.left / canvas.width,
+      topFactor: logoImageObj.top / canvas.height,
+      scaleFactor: logoImageObj.scaleX / canvas.width,
+      angle: logoImageObj.angle,
+    };
+  } else {
+    state.lastLogoState = null;
+  }
 
   // ✅ RESTORE "WITH LOGO" model but HIDE the logo physically
   const selectedModelName = state.thumbnails[state.selectedIndex]?.name;
@@ -2550,7 +2658,6 @@ saveLogoBtn.addEventListener("click", async () => {
     canvas.remove(logoImageObj);
     logoImageObj = null;
   }
-  state.logoDataUrl = null;
 });
 
 /********** INIT **********/

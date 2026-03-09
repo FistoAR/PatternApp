@@ -1812,6 +1812,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const isSweetBox =
       modelCategory === "Sweet Box" ||
       modelCategory === "Sweet Box TE" ||
+      modelCategory === "Sweet Box Tamper Evident" ||
       modelCategory === "Square" ||
       modelCategory === "Square TE" ||
       modelCategory === "Square Box TE";
@@ -2199,6 +2200,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const loadingOverlay = document.getElementById("pdfLoadingOverlay");
     loadingOverlay.style.display = "flex";
 
+    // Wait 3 seconds so the loading screen is visible before work starts
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
     const sortedModels = [...renderedModels].sort((a, b) => {
       const idA = parseInt(a.dataset.id);
       const idB = parseInt(b.dataset.id);
@@ -2232,7 +2236,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const pageHeight = pdf.internal.pageSize.getHeight();
       console.log(`Page size: ${pageWidth} x ${pageHeight}`);
 
-      const totalPages = sortedModels.length + 2;
+      const totalSummaryPagesCalc = Math.ceil(sortedModels.length / 3);
+      const totalPages = sortedModels.length + 1 + totalSummaryPagesCalc; // cover + model pages + summary pages
       // --- Cover Page ---
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
@@ -2462,72 +2467,118 @@ window.addEventListener("DOMContentLoaded", () => {
         );
       }
 
-      // --- Summary Page ---
-      pdf.addPage();
-      pdf.setFillColor(245, 210, 218);
-      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      // --- Summary Pages (max 3 textures per page) ---
+      const TEXTURES_PER_PAGE = 3;
+      const summaryMarginX = 40;
+      const summaryStartY = 80;
+      const summarySpaceBetween = 20;
+      const summaryMaxImageWidth = pageWidth - summaryMarginX * 2;
 
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(18);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text("All Applied Textures", pageWidth / 2, 50, { align: "center" });
+      // Calculate fixed height per slot based on 3 images per page
+      const summaryAvailableHeight = pageHeight - summaryStartY - 60; // leave room for header + footer
+      const slotHeight =
+        (summaryAvailableHeight -
+          (TEXTURES_PER_PAGE - 1) * summarySpaceBetween) /
+        TEXTURES_PER_PAGE;
 
-      const marginX = 40;
-      const startY = 80;
-      const spaceBetween = 20;
-      let currentY = startY;
-
-      const maxImageWidth = pageWidth - marginX * 2;
-      const availableHeight1 = pageHeight - startY - 40;
-      const cardsCount = sortedModels.length;
-      const maxHeightPerImage =
-        (availableHeight1 - (cardsCount - 1) * spaceBetween) / cardsCount;
-
-      for (let i = 0; i < sortedModels.length; i++) {
-        const tubUrl = sortedModels[i].dataset.textureDataUrl;
-        const lidUrl = sortedModels[i].dataset.lidTextureDataUrl;
-
-        const drawTexture = async (url) => {
-          if (!url) return;
-          await new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-              const aspectRatio = img.width / img.height;
-              let imgWidth = maxImageWidth / (lidUrl ? 2.1 : 1);
-              let imgHeight = imgWidth / aspectRatio;
-              if (imgHeight > maxHeightPerImage) {
-                imgHeight = maxHeightPerImage;
-                imgWidth = imgHeight * aspectRatio;
-              }
-              const imageX = lidUrl
-                ? url === tubUrl
-                  ? pageWidth / 2 - imgWidth - 10
-                  : pageWidth / 2 + 10
-                : (pageWidth - imgWidth) / 2;
-              pdf.addImage(img, "PNG", imageX, currentY, imgWidth, imgHeight);
-              resolve();
-            };
-            img.onerror = reject;
-            img.src = url;
-          });
-        };
-
-        if (tubUrl) await drawTexture(tubUrl);
-        if (lidUrl) await drawTexture(lidUrl);
-        currentY += maxHeightPerImage + spaceBetween;
-      }
-
-      // Footer for summary page
-      const summaryPageNumber = totalPages;
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text(
-        `${summaryPageNumber}/${totalPages}`,
-        pageWidth / 2,
-        pageHeight - 25,
-        { align: "center" },
+      // Calculate total summary pages needed
+      const totalSummaryPages = Math.ceil(
+        sortedModels.length / TEXTURES_PER_PAGE,
       );
+      // Recalculate grand total pages now (cover + model pages + summary pages)
+      const grandTotalPages = 1 + sortedModels.length + totalSummaryPages;
+
+      for (let sp = 0; sp < totalSummaryPages; sp++) {
+        pdf.addPage();
+
+        // Summary page background
+        pdf.setFillColor(245, 210, 218);
+        pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+        // Summary page header
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
+        pdf.setTextColor(0, 0, 0);
+        const summaryPageLabel =
+          totalSummaryPages > 1
+            ? `All Applied Textures (${sp + 1}/${totalSummaryPages})`
+            : "All Applied Textures";
+        pdf.text(summaryPageLabel, pageWidth / 2, 50, { align: "center" });
+
+        // Draw up to TEXTURES_PER_PAGE cards on this summary page
+        const startIdx = sp * TEXTURES_PER_PAGE;
+        const endIdx = Math.min(
+          startIdx + TEXTURES_PER_PAGE,
+          sortedModels.length,
+        );
+
+        let slotY = summaryStartY;
+
+        for (let i = startIdx; i < endIdx; i++) {
+          const tubUrl = sortedModels[i].dataset.textureDataUrl;
+          const lidUrl = sortedModels[i].dataset.lidTextureDataUrl;
+          const cardTitle = sortedModels[i].dataset.title || "";
+          const cardId = sortedModels[i].dataset.id || i + 1;
+
+          // Small label above each texture slot
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.setTextColor(60, 60, 60);
+          pdf.text(
+            `Option ${cardId}${cardTitle ? " — " + cardTitle : ""}`,
+            summaryMarginX,
+            slotY - 2,
+          );
+
+          const drawSummaryTexture = async (url, isLid) => {
+            if (!url) return;
+            await new Promise((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => {
+                const hasBoth = tubUrl && lidUrl;
+                const aspectRatio = img.width / img.height;
+                let imgWidth = hasBoth
+                  ? summaryMaxImageWidth / 2.1
+                  : summaryMaxImageWidth;
+                let imgHeight = imgWidth / aspectRatio;
+                if (imgHeight > slotHeight) {
+                  imgHeight = slotHeight;
+                  imgWidth = imgHeight * aspectRatio;
+                }
+                let imageX;
+                if (hasBoth) {
+                  imageX = isLid
+                    ? pageWidth / 2 + 10
+                    : pageWidth / 2 - imgWidth - 10;
+                } else {
+                  imageX = (pageWidth - imgWidth) / 2;
+                }
+                pdf.addImage(img, "PNG", imageX, slotY, imgWidth, imgHeight);
+                resolve();
+              };
+              img.onerror = reject;
+              img.src = url;
+            });
+          };
+
+          if (tubUrl) await drawSummaryTexture(tubUrl, false);
+          if (lidUrl) await drawSummaryTexture(lidUrl, true);
+
+          slotY += slotHeight + summarySpaceBetween;
+        }
+
+        // Footer for each summary page
+        const summaryPageNumber = 1 + sortedModels.length + sp + 1;
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(
+          `${summaryPageNumber}/${grandTotalPages}`,
+          pageWidth / 2,
+          pageHeight - 25,
+          { align: "center" },
+        );
+      }
 
       // Save PDF
       console.log("Saving PDF...");
@@ -2535,6 +2586,12 @@ window.addEventListener("DOMContentLoaded", () => {
         `Selected_Theme_Mockup_${new Date().toISOString().slice(0, 10)}.pdf`,
       );
       console.log("PDF saved successfully!");
+
+      // --- Clear Rendered Models After Export ---
+      renderedModels.length = 0; // Clear the array
+      renderedImages.innerHTML = ""; // Clear the UI container
+      updateSelectionInfo(); // Update the export button state and label
+      toggleClearButtonState(); // Update the clear all button state
     } catch (error) {
       console.error("PDF Export failed:", error);
       alert("PDF Export failed. Check console for details.");
@@ -2567,11 +2624,14 @@ window.addEventListener("DOMContentLoaded", () => {
     const extension = format === "png" ? "png" : "jpg";
 
     try {
-      // Show high-end full-page loader
+      // Show full-screen loader instantly
       const loadingOverlay = document.getElementById("pdfLoadingOverlay");
       const loadingText = loadingOverlay.querySelector("span");
       loadingText.textContent = `Rendering UHD ${format.toUpperCase()}...`;
       loadingOverlay.style.display = "flex";
+
+      // Wait 3 seconds so the loading screen is visible before capture starts
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Disable button
       const originalContent = downloadModelBtn.innerHTML;
@@ -2621,10 +2681,15 @@ window.addEventListener("DOMContentLoaded", () => {
       );
 
       if (dataUrl) {
-        // We REMOVED trimTransparency here to ensure user's zoom out is respected
+        // Generate a clean filename: replace spaces with underscores and remove non-alphanumeric chars
+        const modelName = (models[selectedModelIndex]?.name || "Model")
+          .trim()
+          .replace(/\s+/g, "_")
+          .replace(/[^a-zA-Z0-9_-]/g, "");
+
         const link = document.createElement("a");
         link.href = dataUrl;
-        link.download = `TerraTech_UHD_Capture_${new Date().getTime()}.${extension}`;
+        link.download = `${modelName}.${extension}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -2652,10 +2717,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
       // Fallback to standard quality
       try {
+        const modelName = (models[selectedModelIndex]?.name || "Model")
+          .trim()
+          .replace(/\s+/g, "_")
+          .replace(/[^a-zA-Z0-9_-]/g, "");
+
         const dataUrl = mainModelViewer.toDataURL(mimeType);
         const link = document.createElement("a");
         link.href = dataUrl;
-        link.download = `TerraTech_Standard_Capture_${new Date().getTime()}.${extension}`;
+        link.download = `${modelName}_Standard.${extension}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

@@ -1010,33 +1010,34 @@ body {
 
 /* Spinner Animation */
 .spinner {
-  width: 4vw;
-  height: 4vw;
-  border: 0.4vw solid rgba(255, 255, 255, 0.1);
-  border-top: 0.4vw solid var(--accent-yellow);
+  width: 56px;
+  height: 56px;
+  border: 5px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #fff;
   border-radius: 50%;
-  animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: spin 0.85s linear infinite;
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to   { transform: rotate(360deg); }
 }
 
 #pdfLoadingOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85); /* Slightly transparent black */
-  backdrop-filter: blur(10px);
+  background: #000000;
   color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.5vw;
-  z-index: 9999;
-  font-size: 1.2vw;
-  font-weight: 600;
+  gap: 20px;
+  z-index: 99999;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  pointer-events: all;
   display: none;
 }
 
