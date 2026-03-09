@@ -299,7 +299,7 @@ async function handleModalSubmit() {
       const ext = pendingFiles.primary.name.split(".").pop().toLowerCase();
       const filename = `${safeCategory}_primary_${Date.now()}.${ext}`;
       const res = await uploadToAssets(pendingFiles.primary, filename);
-      if (!res.success) throw new Error("Primary upload failed");
+      if (!res.success) throw new Error("File size is too large");
       payload.pattern_url = filename;
     }
 
@@ -307,7 +307,7 @@ async function handleModalSubmit() {
       const ext = pendingFiles.top.name.split(".").pop().toLowerCase();
       const filename = `${safeCategory}_top_${Date.now()}.${ext}`;
       const res = await uploadToAssets(pendingFiles.top, filename);
-      if (!res.success) throw new Error("Top upload failed");
+      if (!res.success) throw new Error("File size is too large");
       payload.pattern_url_top = filename;
     }
 

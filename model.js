@@ -441,7 +441,7 @@ function resolvePatternUrl(input) {
 // Canonical shape mapping for: Round, Round Square, Rectangle, Sweet Box, Sweet Box TE
 function getCanonicalShape(shapeStr) {
   if (!shapeStr) return "";
-  const s = shapeStr.trim().toLowerCase();
+  const s = shapeStr.trim().toLowerCase().replace(/_/g, " ");
 
   if (s.includes("round square")) return "Round Square";
   if (s.includes("round")) return "Round";
@@ -584,6 +584,13 @@ function filterPatternAccordion(shapeFilter, keepCycleIndex = false) {
   const shapeLower = (shapeFilter || "").trim().toLowerCase();
 
   items.forEach((li) => {
+    // ✅ CATEGORY LEVEL FILTERING: If the category itself is for a different shape, hide it
+    const liShape = getCanonicalShape(li.dataset.shapeType).toLowerCase();
+    if (shapeFilter && liShape !== shapeLower) {
+      li.style.display = "none";
+      return;
+    }
+
     const swatches = li.querySelectorAll(".pattern-swatch");
     const headers = li.querySelectorAll(".pattern-group-header");
     let hasMatch = false;
@@ -658,23 +665,38 @@ function filterPatternAccordion(shapeFilter, keepCycleIndex = false) {
     }
   });
 
-  // ✅ SEQUENTIAL FILTERING: Group pool patterns by Category order
+  // ✅ SEQUENTIAL FILTERING: Build a pool that matches EXACTLY what's visible in the accordion
   const pool = [];
 
-  // Iterate categories in order
   state.categories.forEach((cat) => {
-    const catPatterns = state.rawPatterns.filter(
-      (p) => p.category_name.toLowerCase() === cat.category.toLowerCase(),
-    );
+    // Only process categories for the current shape (respecting the display logic)
+    const liShape = getCanonicalShape(cat.shape_type).toLowerCase();
+    if (shapeFilter && liShape !== shapeLower) return;
+
+    const catPatterns = state.rawPatterns.filter((p) => {
+      const pCat = (p.category_name || "").trim().toLowerCase();
+      const cCat = (cat.category || "").trim().toLowerCase();
+      const pShape = getCanonicalShape(p.shape_type).toLowerCase();
+      const cShape = getCanonicalShape(cat.shape_type).toLowerCase();
+      return pCat === cCat && pShape === cShape;
+    });
 
     catPatterns.forEach((p) => {
-      const pShape = (p.shape_type || "").trim().toLowerCase();
-      // Only include if matches shape filter (or no filter)
+      const pShape = getCanonicalShape(p.shape_type).toLowerCase();
       if (!shapeFilter || pShape === shapeLower) {
-        const u1 = resolvePatternUrl(p.pattern_url);
-        const u2 = resolvePatternUrl(p.pattern_url_top);
-        if (u1) pool.push(u1);
-        if (u2) pool.push(u2);
+        if (pShape.includes("sweet box")) {
+          // Sweet Box: Push the primary URL (Tub) which acts as the key for full set application
+          const u = resolvePatternUrl(p.pattern_url);
+          if (u) pool.push(u);
+        } else if (pShape === "rectangle") {
+          // Rectangle: Push Lid only
+          const u = resolvePatternUrl(p.pattern_url_top);
+          if (u) pool.push(u);
+        } else {
+          // Round / Round Square: Push Tub only
+          const u = resolvePatternUrl(p.pattern_url);
+          if (u) pool.push(u);
+        }
       }
     });
   });
@@ -817,10 +839,9 @@ async function selectModel(index) {
         // Only apply if user hasn't switched to another model (redundant check for safety)
         if (state.selectedIndex !== capturedIndex) return;
 
-        // Apply last pattern if it exists, otherwise find a default for the new shape
+        // Apply first pattern if auto-apply is OFF and shape changed
         if (!state.patternUrl) {
           let firstCompatible = null;
-          // ✅ Prioritize 1st Category 1st Pattern by following state.categories order
           for (const cat of state.categories) {
             const catPatterns = state.rawPatterns.filter(
               (p) =>
@@ -833,15 +854,23 @@ async function selectModel(index) {
           }
 
           if (firstCompatible) {
-            const url = isRect
-              ? firstCompatible.pattern_url_top
-              : firstCompatible.pattern_url;
-            if (url) {
-              state.patternUrl = resolvePatternUrl(url);
-              state.lastLibraryPatternUrl = state.patternUrl;
-              state.patternUrlTop = isRect ? state.patternUrl : null;
-              state.currentPatternType = isRect ? "top" : "bottom";
+            const uBottom = resolvePatternUrl(firstCompatible.pattern_url);
+            const uTop = resolvePatternUrl(firstCompatible.pattern_url_top);
+
+            if (curShape.toLowerCase().includes("sweet box")) {
+              state.patternUrl = uBottom;
+              state.patternUrlTop = uTop;
+              state.currentPatternType = "full";
+            } else if (isRect) {
+              state.patternUrl = uTop;
+              state.patternUrlTop = uTop;
+              state.currentPatternType = "top";
+            } else {
+              state.patternUrl = uBottom;
+              state.patternUrlTop = null;
+              state.currentPatternType = "bottom";
             }
+            state.lastLibraryPatternUrl = state.patternUrl;
           }
         }
 
@@ -934,12 +963,18 @@ async function initCategoryAccordion() {
   const finalUrls = [];
 
   categories.forEach((cat) => {
-    const catPatterns = allPatternsData.filter(
-      (p) => p.category_name.toLowerCase() === cat.category.toLowerCase(),
-    );
+    // ✅ STRICT FILTERING: Only include patterns that match BOTH category name and shape type
+    const catPatterns = allPatternsData.filter((p) => {
+      const pCat = (p.category_name || "").trim().toLowerCase();
+      const cCat = (cat.category || "").trim().toLowerCase();
+      const pShape = getCanonicalShape(p.shape_type).toLowerCase();
+      const cShape = getCanonicalShape(cat.shape_type).toLowerCase();
+      return pCat === cCat && pShape === cShape;
+    });
 
     const li = document.createElement("li");
     li.dataset.categoryName = cat.category;
+    li.dataset.shapeType = cat.shape_type;
 
     const header = document.createElement("div");
     header.className = "accordion-header";
@@ -1019,7 +1054,7 @@ async function initCategoryAccordion() {
               );
               if (!confirmed) return;
             }
-
+            state.currentPatternType = "full";
             // Apply both in parallel
             await applyPatternToAll(urlBottom, {
               patternUrlTop: urlTop,
@@ -1069,6 +1104,7 @@ async function initCategoryAccordion() {
                 );
                 if (!confirmed) return;
               }
+              state.currentPatternType = patObj.type;
               await applyPatternToAll(url);
             });
 
@@ -1495,11 +1531,6 @@ async function applyPatternToAll(
       await Promise.all([
         applyOne(patternUrl, "bottom"),
         applyOne(patternUrlTop, "top"),
-      ]);
-    } else if (sw && sw.dataset.patternType === "full") {
-      await Promise.all([
-        applyOne(sw.dataset.patternUrl, "bottom"),
-        applyOne(sw.dataset.patternUrlTop, "top"),
       ]);
     } else {
       await applyOne(patternUrl, state.currentPatternType || "bottom");
