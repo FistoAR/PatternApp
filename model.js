@@ -2319,7 +2319,24 @@ saveLogoBtn.addEventListener("click", async () => {
 /********** INIT **********/
 document.addEventListener("DOMContentLoaded", async () => {
   const preloader = document.getElementById("preloader");
+  const video = document.getElementById("preloaderVideo");
   if (preloader) preloader.style.display = "flex";
+
+  // 📹 VIDEO COMPLETION PROMISE: Ensure we see the animation at least once
+  const videoCyclePromise = new Promise((resolve) => {
+    if (!video) {
+      resolve();
+      return;
+    }
+    const checkEnd = () => {
+      if (video.duration > 0 && video.currentTime >= video.duration - 0.2) {
+        video.removeEventListener("timeupdate", checkEnd);
+        resolve();
+      }
+    };
+    video.addEventListener("timeupdate", checkEnd);
+    setTimeout(resolve, 8000); // fallback
+  });
 
   const saved = localStorage.getItem("selectedColors");
   if (saved) {
@@ -2408,12 +2425,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // ✅ Wait for at least one video cycle
+  await videoCyclePromise;
+
   // ✅ Hide preloader
   if (preloader) {
     preloader.classList.add("fade-out");
     setTimeout(() => {
       preloader.style.display = "none";
-    }, 500);
+    }, 800);
   }
 });
 
