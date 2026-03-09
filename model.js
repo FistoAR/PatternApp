@@ -313,13 +313,13 @@ const MODEL_CATEGORIES = {
       path: "./assets/Model_with_logo/1kg Sweet_box with logo.glb",
     },
   ],
-  "Sweet Box TE": [
+  "Sweet Box Tamper Evident": [
     {
-      name: "250gms Sweet BoxTE",
+      name: "250gms Sweet Box Tamper Evident",
       path: "./assets/Model_with_logo/250gms Sweet_box_TE with logo.glb",
     },
     {
-      name: "500gms Sweet BoxTE",
+      name: "500gms Sweet Box Tamper Evident",
       path: "./assets/Model_with_logo/500gms Sweet_box_TE with logo.glb",
     },
   ],
@@ -354,7 +354,7 @@ const MODEL_CATEGORIES_WITHOUT_LOGO = {
   ],
   "Round Square": [
     {
-      name: "500gms/450ml Container",
+      name: "450ml/500gms Container",
       path: "./assets/Model_without_logo/450ml cont without logo.glb",
     },
     {
@@ -386,13 +386,13 @@ const MODEL_CATEGORIES_WITHOUT_LOGO = {
       path: "./assets/Model_without_logo/500gms SB without logo.glb",
     },
   ],
-  "Sweet Box TE": [
+  "Sweet Box Tamper Evident": [
     {
-      name: "250gms Sweet BoxTE",
+      name: "250gms Sweet Box Tamper Evident",
       path: "./assets/Model_without_logo/TE 250 sb without logo.glb",
     },
     {
-      name: "500gms Sweet BoxTE",
+      name: "500gms Sweet Box Tamper Evident",
       path: "./assets/Model_without_logo/TE 500 sb without logo.glb",
     },
   ],
@@ -445,7 +445,8 @@ function getCanonicalShape(shapeStr) {
 
   if (s.includes("round square")) return "Round Square";
   if (s.includes("round")) return "Round";
-  if (s.includes("sweet box te")) return "Sweet Box TE";
+  if (s.includes("sweet box tamper evident") || s.includes("sweet box te"))
+    return "Sweet Box Tamper Evident";
   if (s.includes("sweet box") || s.includes("sb")) return "Sweet Box";
   if (s.includes("rectangle") || s.includes("rect")) return "Rectangle";
 
@@ -758,7 +759,11 @@ async function selectModel(index) {
   else if (lowerCat === "round square") shapeFilter = "Round Square";
   else if (lowerCat === "rectangle") shapeFilter = "Rectangle";
   else if (lowerCat === "sweet box") shapeFilter = "Sweet Box";
-  else if (lowerCat === "sweet box te") shapeFilter = "Sweet Box TE";
+  else if (
+    lowerCat === "sweet box tamper evident" ||
+    lowerCat === "sweet box te"
+  )
+    shapeFilter = "Sweet Box Tamper Evident";
 
   const typeChanged = state.currentShapeFilter !== shapeFilter;
 
@@ -1386,6 +1391,7 @@ function isRectangleModel(name) {
     "rect",
     "rectangular",
     "sweet box",
+    "sweet box tamper evident",
     "sweet box te",
   ];
   const result = keywords.some((k) => lower.includes(k));
@@ -2051,20 +2057,12 @@ function getModelWithoutLogoPath(selectedIndex) {
     const found = models.find((m) => m.name === selectedModelName);
     if (found) return found.path;
   }
-  for (const models of Object.values(RECTANGLE_MODEL_CATEGORIES_WITHOUT_LOGO)) {
-    const found = models.find((m) => m.name === selectedModelName);
-    if (found) return found.path;
-  }
   return null;
 }
 
 function getWithLogoModelPathByName(name) {
   if (!name) return null;
   for (const models of Object.values(MODEL_CATEGORIES)) {
-    const found = models.find((m) => m.name === name);
-    if (found) return found.path;
-  }
-  for (const models of Object.values(Rectangle_MODEL_CATEGORIES)) {
     const found = models.find((m) => m.name === name);
     if (found) return found.path;
   }

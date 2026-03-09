@@ -305,7 +305,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Enhanced texture and color application ---
- async function tryApplyMaterialTexture(
+  async function tryApplyMaterialTexture(
     viewer,
     materialNames,
     textureUrl,
@@ -320,37 +320,37 @@ window.addEventListener("DOMContentLoaded", () => {
         viewer.addEventListener("load", res, { once: true }),
       );
     }
- 
+
     const names = Array.isArray(materialNames)
       ? materialNames
       : [materialNames];
- 
+
     console.log(`Names: ${names}`);
     // Process main materials (typically for textures)
     const targetMaterials =
-      viewer.model?.materials?.filter(m =>
-  names.some(n => m.name.toLowerCase().includes(n.toLowerCase()))
-) || [];
- 
+      viewer.model?.materials?.filter((m) =>
+        names.some((n) => m.name.toLowerCase().includes(n.toLowerCase())),
+      ) || [];
+
     console.log(`Target materials: ${targetMaterials}`);
- 
+
     for (const mat of targetMaterials) {
       console.log(`Mat: ${JSON.stringify(mat, 2, null)}`);
       try {
         let vcache = viewerTextureCache.get(viewer) || new Map();
         viewerTextureCache.set(viewer, vcache);
- 
+
         const cacheKey = mat.name + "::" + stripQuery(textureUrl);
         let tex =
           vcache.get(cacheKey) ||
           (await viewer.createTexture(encodeURI(textureUrl)));
         vcache.set(cacheKey, tex);
- 
+
         if (mat.pbrMetallicRoughness.baseColorTexture) {
           mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
           // Always reset color factor to white for stickers/labels to ensure original texture color
           mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-          console.info('Applied texture to: ' + mat);
+          console.info("Applied texture to: " + mat);
         } else {
           console.warn(
             `Material ${mat.name} does not have a baseColorTexture slot and no tint fallback provided.`,
@@ -360,7 +360,7 @@ window.addEventListener("DOMContentLoaded", () => {
         console.error("Failed to apply texture:", err);
       }
     }
- 
+
     // Colors are now handled externally via syncViewerState or updatePartTransparency
   }
 
@@ -1571,10 +1571,10 @@ window.addEventListener("DOMContentLoaded", () => {
       ],
     },
     {
-      category: "Square Box TE",
+      category: "Sweet Box Tamper Evident",
       models: [
         {
-          name: "250g Sweet Box TE",
+          name: "250g Sweet Box Tamper Evident",
           frontSrc:
             "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-main.glb",
           angles: [
@@ -1608,7 +1608,7 @@ window.addEventListener("DOMContentLoaded", () => {
           ],
         },
         {
-          name: "500g Sweet Box TE",
+          name: "500g Sweet Box Tamper Evident",
           frontSrc:
             "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.glb",
           angles: [

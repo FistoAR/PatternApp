@@ -17,7 +17,10 @@ const MIN_DIMENSIONS = {
   "round square": { primary: { w: 2186, h: 563 } },
   rectangle: { top: { w: 1074, h: 722 } },
   "sweet box": { primary: { w: 5808, h: 420 }, top: { w: 856, h: 669 } },
-  "sweet box te": { primary: { w: 2927, h: 2361 }, top: { w: 1464, h: 1102 } },
+  "sweet box tamper evident": {
+    primary: { w: 2927, h: 2361 },
+    top: { w: 1464, h: 1102 },
+  },
 };
 
 function getImageDimensions(file) {
@@ -390,8 +393,8 @@ const SHAPE_TYPES = [
       "https://images.pexels.com/photos/28769885/pexels-photo-28769885.jpeg",
   },
   {
-    id: "Sweet Box TE",
-    label: "Sweet Box TE",
+    id: "Sweet Box Tamper Evident",
+    label: "Sweet Box Tamper Evident",
     image: "https://images.pexels.com/photos/4841368/pexels-photo-4841368.jpeg",
   },
 ];
