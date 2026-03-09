@@ -1171,30 +1171,267 @@ async function initCategoryAccordion() {
 const exportBtn = document.getElementById("exportBtn");
 const exportFormat = document.getElementById("exportFormat");
 
+// ---- UHD Export helpers ----
+
+/**
+ * Composite a transparent-background PNG data-URL over a solid fill colour.
+ * Returns a new data-URL with the background baked in (required for JPG/PDF).
+ */
+function compositeWithBackground(pngDataUrl, bgColor, width, height) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = width;
+      c.height = height;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(c.toDataURL("image/png", 1.0));
+    };
+    img.src = pngDataUrl;
+  });
+}
+
+/**
+ * Wait for N animation frames then an extra delay.
+ * Used so WebGL has time to re-render after a resize.
+ */
+function waitFrames(count = 6, extraMs = 600) {
+  return new Promise((resolve) => {
+    let n = count;
+    const tick = () => {
+      if (--n > 0) requestAnimationFrame(tick);
+      else setTimeout(resolve, extraMs);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+/**
+ * Capture a UHD (3840x2160) screenshot using the LIVE mainViewer —
+ * completely invisible to the user.
+ *
+ * How it works:
+ *  1. Record the viewer's current on-screen bounding rect.
+ *  2. Switch it to position:fixed at UHD size (3840×2160).
+ *  3. Immediately apply a CSS transform:scale() that shrinks it back to
+ *     its original visual footprint → the user sees nothing change.
+ *  4. WebGL re-renders at the new DOM size (3840×2160) — transforms are
+ *     applied AFTER GPU rasterisation, so the canvas IS UHD.
+ *  5. toDataURL() captures the full 3840×2160 canvas.
+ *  6. Restore all styles.
+ */
+async function captureUHDImage() {
+  const UHD_W = 3840;
+  const UHD_H = 2160;
+
+  // Background colour
+  const bgRaw =
+    document.getElementById("modelcontainer")?.style.backgroundColor ||
+    "#c7c7c7";
+
+  // ── 1. Snapshot current visual position & size ───────────────────────────
+  const rect = mainViewer.getBoundingClientRect();
+  const scaleX = rect.width / UHD_W;
+  const scaleY = rect.height / UHD_H;
+
+  // ── 2. Save existing inline styles ───────────────────────────────────────
+  const savedStyle = {
+    position: mainViewer.style.position,
+    top: mainViewer.style.top,
+    left: mainViewer.style.left,
+    width: mainViewer.style.width,
+    height: mainViewer.style.height,
+    transform: mainViewer.style.transform,
+    transformOrigin: mainViewer.style.transformOrigin,
+    zIndex: mainViewer.style.zIndex,
+    flex: mainViewer.style.flex,
+    minWidth: mainViewer.style.minWidth,
+    minHeight: mainViewer.style.minHeight,
+    maxWidth: mainViewer.style.maxWidth,
+    maxHeight: mainViewer.style.maxHeight,
+  };
+
+  try {
+    // ── 3. Resize to UHD, scale back to original visual size ─────────────
+    //    position:fixed takes it out of layout flow (no reflow / shift).
+    //    transform:scale shrinks the visual output so nothing is visible.
+    Object.assign(mainViewer.style, {
+      position: "fixed",
+      top: `${rect.top}px`,
+      left: `${rect.left}px`,
+      width: `${UHD_W}px`,
+      height: `${UHD_H}px`,
+      transform: `scale(${scaleX}, ${scaleY})`,
+      transformOrigin: "top left",
+      zIndex: "1",
+      flex: "none",
+      minWidth: "unset",
+      minHeight: "unset",
+      maxWidth: "unset",
+      maxHeight: "unset",
+    });
+
+    // ── 4. Wait for WebGL to produce a UHD frame ─────────────────────────
+    await waitFrames(8, 700);
+
+    // ── 5. Capture at full UHD resolution ────────────────────────────────
+    const rawDataUrl = await mainViewer.toDataURL("image/png", 1.0);
+    return { rawDataUrl, bgRaw };
+  } finally {
+    // ── 6. Restore all original styles ───────────────────────────────────
+    Object.assign(mainViewer.style, savedStyle);
+  }
+}
+
+// ── Full-screen export overlay helpers ───────────────────────────────────────
+
+function showExportOverlay() {
+  const old = document.getElementById("uhd-export-overlay");
+  if (old) old.remove();
+
+  // Inject styles once
+  if (!document.getElementById("uhd-overlay-style")) {
+    const s = document.createElement("style");
+    s.id = "uhd-overlay-style";
+    s.textContent = `
+      #uhd-export-overlay {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        opacity: 0;
+        transition: opacity .2s ease;
+        pointer-events: all;
+      }
+      #uhd-export-overlay.visible { opacity: 1; }
+      .uhd-overlay-spinner {
+        width: 56px; height: 56px;
+        border: 5px solid rgba(255,255,255,.18);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: uhd-ov-spin .85s linear infinite;
+      }
+      @keyframes uhd-ov-spin { to { transform: rotate(360deg); } }
+      .uhd-overlay-label {
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: .4px;
+        opacity: .85;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "uhd-export-overlay";
+  overlay.innerHTML = `
+    <div class="uhd-overlay-spinner"></div>
+    <span class="uhd-overlay-label">Generating UHD export…</span>
+  `;
+  document.body.appendChild(overlay);
+
+  // Trigger fade-in on next frame
+  requestAnimationFrame(() => overlay.classList.add("visible"));
+  return overlay;
+}
+
+function hideExportOverlay() {
+  const overlay = document.getElementById("uhd-export-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("visible");
+  setTimeout(() => overlay.remove(), 250);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ---- Main export button listener ----
+
 exportBtn.addEventListener("click", async () => {
   const format = exportFormat.value;
-  const modelName = mainModelTitle.textContent.replace(/\s+/g, "_");
+  const modelName = mainModelTitle.textContent.trim().replace(/\s+/g, "_");
 
   if (!mainViewer) return;
 
+  // Disable button + show full-screen overlay instantly
+  const originalText = exportBtn.textContent;
+  exportBtn.disabled = true;
+  exportBtn.textContent = "Exporting…";
+  showExportOverlay();
+
   try {
-    const dataUrl = await mainViewer.toDataURL();
+    const UHD_W = 3840;
+    const UHD_H = 2160;
+
+    const { rawDataUrl, bgRaw } = await captureUHDImage();
+
     if (format === "pdf") {
+      // ── PDF: embed UHD image into a 3840×2160 pt page ───────────────────
+      const composited = await compositeWithBackground(
+        rawDataUrl,
+        bgRaw,
+        UHD_W,
+        UHD_H,
+      );
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: "landscape" });
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
+      // Use millimetre units, landscape, custom UHD size (scaled to mm: 1pt≈0.3528mm)
+      // 3840×2160 px at 96 dpi → in mm: (3840/96)*25.4 = 1016mm × 571.5mm
+      const mmW = (UHD_W / 96) * 25.4;
+      const mmH = (UHD_H / 96) * 25.4;
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: [mmW, mmH],
+      });
+      pdf.addImage(composited, "PNG", 0, 0, mmW, mmH, "", "FAST");
       pdf.save(`${modelName}.pdf`);
-    } else {
+    } else if (format === "jpg") {
+      // ── JPG: composite background then re-encode as JPEG for max quality ──
+      const composited = await compositeWithBackground(
+        rawDataUrl,
+        bgRaw,
+        UHD_W,
+        UHD_H,
+      );
+      // Convert to JPEG at quality 1.0
+      const jpgCanvas = document.createElement("canvas");
+      jpgCanvas.width = UHD_W;
+      jpgCanvas.height = UHD_H;
+      const ctx = jpgCanvas.getContext("2d");
+      const img = await new Promise((res) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.src = composited;
+      });
+      ctx.drawImage(img, 0, 0);
+      const jpgDataUrl = jpgCanvas.toDataURL("image/jpeg", 1.0);
       const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `${modelName}.${format}`;
+      link.href = jpgDataUrl;
+      link.download = `${modelName}.jpg`;
+      link.click();
+    } else {
+      // ── PNG: transparent-background UHD export ────────────────────────────
+      const link = document.createElement("a");
+      link.href = rawDataUrl;
+      link.download = `${modelName}.png`;
       link.click();
     }
   } catch (err) {
-    console.error("Export failed:", err);
+    console.error("UHD Export failed:", err);
+    alert("Export failed. Please try again.");
+  } finally {
+    hideExportOverlay();
+    exportBtn.disabled = false;
+    exportBtn.textContent = originalText;
   }
 });
 

@@ -560,6 +560,7 @@ window.addEventListener("DOMContentLoaded", () => {
     tubMaterialColor = null,
     isTubTransparent = false,
     isLidTransparent = false,
+    cameraTarget = null,
   ) {
     const card = document.createElement("div");
     card.className = "rendered-card";
@@ -573,6 +574,7 @@ window.addEventListener("DOMContentLoaded", () => {
     card.dataset.backgroundColor = backgroundColor;
     card.dataset.cameraOrbit = cameraOrbit || "";
     card.dataset.fieldOfView = fieldOfView || "";
+    card.dataset.cameraTarget = cameraTarget || "";
     card.dataset.selectedLogo = ""; // Store selected logo for this card
     card.dataset.isTubTransparent = isTubTransparent ? "true" : "false";
     card.dataset.isLidTransparent = isLidTransparent ? "true" : "false";
@@ -873,6 +875,8 @@ window.addEventListener("DOMContentLoaded", () => {
         const orbit = modelViewer.getCameraOrbit();
         const currentLiveOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg ${orbit.radius.toFixed(4)}m`;
         const currentLiveFOV = `${modelViewer.getFieldOfView().toFixed(2)}deg`;
+        const target = modelViewer.getCameraTarget();
+        const currentLiveTarget = `${target.x}m ${target.y}m ${target.z}m`;
 
         const card = createRenderedCard(
           tubTextureDataURL,
@@ -887,6 +891,7 @@ window.addEventListener("DOMContentLoaded", () => {
           tubColor.value,
           tubTransparent.checked,
           lidTransparent.checked,
+          currentLiveTarget,
         );
         renderedImages.appendChild(card);
         renderedModels.push(card);
@@ -1968,12 +1973,12 @@ window.addEventListener("DOMContentLoaded", () => {
   renderModels();
   renderAngles();
 
-  // --- PDF-specific model viewer creation ---
   async function createPDFModelViewer(
     modelSrcForCard,
     tubTextureDataURL,
     topMaterialColor = null,
-    customSize = 800,
+    customWidth = 800,
+    customHeight = 600,
     lidTextureDataURL = null,
     cameraOrbit = null,
     fieldOfView = null,
@@ -1988,27 +1993,29 @@ window.addEventListener("DOMContentLoaded", () => {
     const pdfModelViewer = document.createElement("model-viewer");
     pdfModelViewer.src = modelSrcForCard || modelSrc;
 
-    // Use the stored orbit rotation but set distance to 'auto' to prevent cropping
     if (cameraOrbit) {
-      const parts = cameraOrbit.split(" ");
-      pdfModelViewer.setAttribute(
-        "camera-orbit",
-        `${parts[0]} ${parts[1]} auto`,
-      );
+      const parts = cameraOrbit.split(" ").filter((p) => p.trim());
+      // If we have 3 parts (theta, phi, radius), use it as is.
+      if (parts.length >= 3) {
+        pdfModelViewer.setAttribute("camera-orbit", cameraOrbit);
+      } else if (parts.length === 2) {
+        pdfModelViewer.setAttribute(
+          "camera-orbit",
+          `${parts[0]} ${parts[1]} auto`,
+        );
+      } else {
+        pdfModelViewer.setAttribute("camera-orbit", cameraOrbit);
+      }
     } else {
       pdfModelViewer.setAttribute("camera-orbit", "auto auto auto");
     }
 
     if (fieldOfView) {
       pdfModelViewer.setAttribute("field-of-view", fieldOfView);
-    } else {
-      pdfModelViewer.setAttribute("field-of-view", "auto");
     }
 
     if (cameraTarget) {
       pdfModelViewer.setAttribute("camera-target", cameraTarget);
-    } else {
-      pdfModelViewer.setAttribute("camera-target", "auto auto auto");
     }
     // Use manual values from selected angle if possible, otherwise use fallbacks
     // Try to find the matching angle's config from categorizedModels
@@ -2028,21 +2035,33 @@ window.addEventListener("DOMContentLoaded", () => {
       manualFov = firstAngle.fov || "20deg";
     }
 
-    pdfModelViewer.setAttribute(
-      "min-camera-orbit",
-      `auto auto ${manualMinDist}m`,
-    );
-    pdfModelViewer.setAttribute(
-      "max-camera-orbit",
-      `auto auto ${manualMaxDist}m`,
-    );
-    pdfModelViewer.setAttribute("field-of-view", manualFov);
+    // Apply standard camera constraints used in updateMainViewer
+    pdfModelViewer.setAttribute("min-field-of-view", "10deg");
+    pdfModelViewer.setAttribute("max-field-of-view", "45deg");
+
+    // If we're using a specific orbit (from a render or capture), don't lock zoom constraints
+    if (cameraOrbit && cameraOrbit.includes("m")) {
+      pdfModelViewer.setAttribute("min-camera-orbit", "auto auto 0.01m");
+      pdfModelViewer.setAttribute("max-camera-orbit", "auto auto 100m");
+      if (!fieldOfView) pdfModelViewer.setAttribute("field-of-view", manualFov);
+    } else {
+      pdfModelViewer.setAttribute(
+        "min-camera-orbit",
+        `auto auto ${manualMinDist}m`,
+      );
+      pdfModelViewer.setAttribute(
+        "max-camera-orbit",
+        `auto auto ${manualMaxDist}m`,
+      );
+      if (!fieldOfView) pdfModelViewer.setAttribute("field-of-view", manualFov);
+    }
+    pdfModelViewer.setAttribute("interpolation-decay", "0"); // Disable camera smoothing for instant capture
     pdfModelViewer.setAttribute("disable-tap", "");
     pdfModelViewer.setAttribute("disable-pan", "");
     pdfModelViewer.setAttribute("interaction-prompt", "none");
     pdfModelViewer.setAttribute("shadow-intensity", "0.5");
-    pdfModelViewer.style.width = `${customSize}px`;
-    pdfModelViewer.style.height = `${customSize}px`;
+    pdfModelViewer.style.width = `${customWidth}px`;
+    pdfModelViewer.style.height = `${customHeight}px`;
     pdfModelViewer.style.position = "fixed";
     pdfModelViewer.style.left = "50%";
     pdfModelViewer.style.top = "50%";
@@ -2098,6 +2117,13 @@ window.addEventListener("DOMContentLoaded", () => {
         lidTextureDataURL,
       );
     }
+
+    // Explicitly re-apply camera settings since model load can reset them
+    if (cameraOrbit) pdfModelViewer.setAttribute("camera-orbit", cameraOrbit);
+    if (cameraTarget)
+      pdfModelViewer.setAttribute("camera-target", cameraTarget);
+    if (fieldOfView) pdfModelViewer.setAttribute("field-of-view", fieldOfView);
+
     console.log("Texture and color applied");
 
     // Increased wait time for UHD 4K rendering and anti-aliasing
@@ -2363,13 +2389,16 @@ window.addEventListener("DOMContentLoaded", () => {
               modelSrcForCard,
               tubTextureDataURL,
               topMaterialColor,
-              pdfModelSize,
+              3840, // Width
+              2160, // Height (Landscape)
               lidTextureDataURL,
               card.dataset.cameraOrbit,
               card.dataset.fieldOfView,
               tubMaterialColor,
               card.dataset.isTubTransparent === "true",
               card.dataset.isLidTransparent === "true",
+              "transparent",
+              card.dataset.cameraTarget,
             );
             if (pdfModelViewer) {
               modelImageData = await capturePDFModelImage(pdfModelViewer);
@@ -2387,13 +2416,6 @@ window.addEventListener("DOMContentLoaded", () => {
         }
 
         if (modelImageData) {
-          try {
-            // Trim transparency to make the model look larger
-            modelImageData = await trimTransparency(modelImageData);
-          } catch (e) {
-            console.warn("Trimming failed, using original image", e);
-          }
-
           const img = new Image();
           await new Promise((res, rej) => {
             img.onload = res;
@@ -2556,11 +2578,12 @@ window.addEventListener("DOMContentLoaded", () => {
       downloadModelBtn.disabled = true;
 
       // Use the high-res capture logic
-      const uhdSize = 3840; // 4K Resolution
+      const uhdWidth = 3840;
+      const uhdHeight = 2160; // 16:9 Landscape
       const currentModelSrc = mainModelViewer.getAttribute("src");
       const orbit = mainModelViewer.getCameraOrbit();
-      // Use 'auto' for distance to ensure the full model fits in the high-res frame
-      const currentOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg auto`;
+      // Use the exact current radius for PNG/JPG export to match the user's zoom
+      const currentOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg ${orbit.radius.toFixed(4)}m`;
       const currentFOV = `${mainModelViewer.getFieldOfView().toFixed(2)}deg`;
 
       const target = mainModelViewer.getCameraTarget();
@@ -2574,7 +2597,8 @@ window.addEventListener("DOMContentLoaded", () => {
         currentModelSrc,
         currentTubTextureDataURL,
         topColor.value,
-        uhdSize,
+        uhdWidth,
+        uhdHeight,
         currentLidTextureDataURL,
         currentOrbit,
         currentFOV,
@@ -2597,16 +2621,7 @@ window.addEventListener("DOMContentLoaded", () => {
       );
 
       if (dataUrl) {
-        // High-end refinement: Trim transparency to make the model center-fit in the final file
-        try {
-          dataUrl = await trimTransparency(dataUrl);
-        } catch (e) {
-          console.warn(
-            "Trimming failed during direct export, using raw capture",
-            e,
-          );
-        }
-
+        // We REMOVED trimTransparency here to ensure user's zoom out is respected
         const link = document.createElement("a");
         link.href = dataUrl;
         link.download = `TerraTech_UHD_Capture_${new Date().getTime()}.${extension}`;

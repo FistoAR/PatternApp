@@ -377,29 +377,31 @@ const SHAPE_TYPES = [
   {
     id: "Round",
     label: "Round",
-    image: "https://images.pexels.com/photos/4354699/pexels-photo-4354699.jpeg",
+    image: "./assets/Angles/round-containers/500ml-round/500ml-round-main.png",
   },
   {
     id: "Round Square",
     label: "Round Square",
     image:
-      "https://images.pexels.com/photos/13968287/pexels-photo-13968287.jpeg",
+      "./assets/Angles/round-square-containers/450ml-round-square/450ml-round-main.png",
   },
   {
     id: "Rectangle",
     label: "Rectangle",
-    image: "https://images.pexels.com/photos/7190355/pexels-photo-7190355.jpeg",
+    image:
+      "./assets/Angles/Rectangle/500ml-rectangle/500ml-rectangular-main.png",
   },
   {
     id: "Sweet Box",
     label: "Sweet Box",
     image:
-      "https://images.pexels.com/photos/28769885/pexels-photo-28769885.jpeg",
+      "./assets/Angles/Sweet-Box/250g-sweet-box/250g-sweet-box-main.png",
   },
   {
     id: "Sweet Box Tamper Evident",
     label: "Sweet Box Tamper Evident",
-    image: "https://images.pexels.com/photos/4841368/pexels-photo-4841368.jpeg",
+    image:
+      "./assets/Angles/Sweet-Box-TE/250g-sweet-box-te/250g-sweet-box-te-main.png",
   },
 ];
 
