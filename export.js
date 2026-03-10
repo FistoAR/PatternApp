@@ -2592,6 +2592,11 @@ window.addEventListener("DOMContentLoaded", () => {
       renderedImages.innerHTML = ""; // Clear the UI container
       updateSelectionInfo(); // Update the export button state and label
       toggleClearButtonState(); // Update the clear all button state
+      
+      // Refresh page after 1 second to ensure user sees success and then starts fresh
+      setTimeout(() => {
+        location.reload();
+      }, 1000);
     } catch (error) {
       console.error("PDF Export failed:", error);
       alert("PDF Export failed. Check console for details.");
@@ -2706,6 +2711,11 @@ window.addEventListener("DOMContentLoaded", () => {
       loadingOverlay.style.display = "none";
       downloadModelBtn.disabled = false;
       downloadModelBtn.innerHTML = originalContent;
+      
+      // Refresh page after 1 second
+      setTimeout(() => {
+        location.reload();
+      }, 1000);
     } catch (error) {
       console.error("UHD capture failed:", error);
 
