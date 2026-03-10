@@ -83,6 +83,8 @@ window.addEventListener("DOMContentLoaded", () => {
   let currentLidTextureDataURL = null;
   let lidColorManualSet = false;
   let tubColorManualSet = false;
+  let lidTransparencyManualSet = false;
+  let tubTransparencyManualSet = false;
   const originalMaterialsCache = new Map(); // Store original material properties for reset
 
   async function syncViewerState(viewer) {
@@ -96,13 +98,25 @@ window.addEventListener("DOMContentLoaded", () => {
       TubColorMaterials.includes(m.name),
     );
 
-    if (firstLid && !lidColorManualSet) {
+    if (firstLid && !lidColorManualSet && !lidTransparencyManualSet) {
       const c = firstLid.pbrMetallicRoughness.baseColorFactor;
       topColor.value = rgbToHex(c[0], c[1], c[2]);
+      // If alpha < 1, automatically enable transparency checkbox
+      if (c[3] < 1.0) {
+        lidTransparent.checked = true;
+      } else {
+        lidTransparent.checked = false;
+      }
     }
-    if (firstTub && !tubColorManualSet) {
+    if (firstTub && !tubColorManualSet && !tubTransparencyManualSet) {
       const c = firstTub.pbrMetallicRoughness.baseColorFactor;
       tubColor.value = rgbToHex(c[0], c[1], c[2]);
+      // If alpha < 1, automatically enable transparency checkbox
+      if (c[3] < 1.0) {
+        tubTransparent.checked = true;
+      } else {
+        tubTransparent.checked = false;
+      }
     }
 
     // 1. Apply Lid State
@@ -395,9 +409,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (isTransparent) {
           // Applying Color + Transparency (Stacking)
           let colorArray;
+          let alpha;
           if (colorHex) {
             // Use manual color
             colorArray = hexToRgbArray(colorHex);
+            alpha = 0.36;
           } else {
             // Use GLB default color (existing color)
             colorArray = [
@@ -405,16 +421,17 @@ window.addEventListener("DOMContentLoaded", () => {
               defaults.baseColorFactor[1],
               defaults.baseColorFactor[2],
             ];
+            alpha = defaults.baseColorFactor[3] < 1.0 ? defaults.baseColorFactor[3] : 0.36;
           }
 
-          mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 0.36]);
+          mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, alpha]);
           mat.setEmissiveFactor([
             colorArray[0] * 0.4,
             colorArray[1] * 0.4,
             colorArray[2] * 0.4,
           ]);
-          mat.pbrMetallicRoughness.setMetallicFactor(0.8);
-          mat.pbrMetallicRoughness.setRoughnessFactor(0.18);
+          mat.pbrMetallicRoughness.setMetallicFactor(colorHex ? 0.8 : defaults.metallicFactor);
+          mat.pbrMetallicRoughness.setRoughnessFactor(colorHex ? 0.18 : defaults.roughnessFactor);
           mat.setAlphaMode("BLEND");
         } else if (colorHex) {
           // Applying Manual Opaque Color
@@ -432,11 +449,18 @@ window.addEventListener("DOMContentLoaded", () => {
           mat.setAlphaMode("OPAQUE");
         } else {
           // RESET: Back to original GLB defaults
-          mat.pbrMetallicRoughness.setBaseColorFactor(defaults.baseColorFactor);
+          // But if we are here and isTransparent is false, we should ensure it's opaque
+          const forcedOpaqueColor = [
+            defaults.baseColorFactor[0],
+            defaults.baseColorFactor[1],
+            defaults.baseColorFactor[2],
+            1.0,
+          ];
+          mat.pbrMetallicRoughness.setBaseColorFactor(forcedOpaqueColor);
           mat.setEmissiveFactor(defaults.emissiveFactor);
           mat.pbrMetallicRoughness.setMetallicFactor(defaults.metallicFactor);
           mat.pbrMetallicRoughness.setRoughnessFactor(defaults.roughnessFactor);
-          mat.setAlphaMode(defaults.alphaMode);
+          mat.setAlphaMode("OPAQUE");
         }
         mat.doubleSided = true;
       } catch (err) {
@@ -457,15 +481,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Adding transparency change to manual set to ensure it reapplies correctly
   lidTransparent.addEventListener("change", () => {
+    lidTransparencyManualSet = true;
     syncViewerState(modelViewer);
   });
 
   tubTransparent.addEventListener("change", () => {
+    tubTransparencyManualSet = true;
     syncViewerState(modelViewer);
   });
 
   bgColor.addEventListener("input", () => {
-    modelbg.style.backgroundColor = bgColor.value;
+    modelbg.style.background = bgColor.value;
   });
 
   function checkFormValidity() {
@@ -568,8 +594,8 @@ window.addEventListener("DOMContentLoaded", () => {
     card.dataset.textureDataUrl = tubTextureDataURL;
     card.dataset.lidTextureDataUrl = lidTextureDataURL || "";
     card.dataset.title = title;
-    card.dataset.topMaterialColor = topMaterialColor;
-    card.dataset.tubMaterialColor = tubMaterialColor || "#ffffff";
+    card.dataset.topMaterialColor = topMaterialColor || "";
+    card.dataset.tubMaterialColor = tubMaterialColor || "";
     card.dataset.modelSrc = modelSrcForCard;
     card.dataset.backgroundColor = backgroundColor;
     card.dataset.cameraOrbit = cameraOrbit || "";
@@ -881,14 +907,14 @@ window.addEventListener("DOMContentLoaded", () => {
         const card = createRenderedCard(
           tubTextureDataURL,
           title,
-          topMaterialColor,
+          lidColorManualSet ? topMaterialColor : null,
           currentModelSrc,
           snapshotDataURL,
           backgroundColor,
           lidDataURL,
           currentLiveOrbit,
           currentLiveFOV,
-          tubColor.value,
+          tubColorManualSet ? tubColor.value : null,
           tubTransparent.checked,
           lidTransparent.checked,
           currentLiveTarget,
@@ -912,13 +938,17 @@ window.addEventListener("DOMContentLoaded", () => {
         bgColor.value = "#c7c7c7";
         tubTransparent.checked = false;
         lidTransparent.checked = false;
+        lidColorManualSet = false;
+        tubColorManualSet = false;
+        lidTransparencyManualSet = false;
+        tubTransparencyManualSet = false;
         modelbg.style.backgroundColor = "#c7c7c7";
         checkFormValidity();
 
         // Reset model materials
         if (modelViewer.model) {
           const bottomMat = modelViewer.model.materials.find(
-            (m) => m.name === materialName,
+            (m) => TubColorMaterials.includes(m.name),
           );
           if (bottomMat) {
             bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(
@@ -927,7 +957,7 @@ window.addEventListener("DOMContentLoaded", () => {
             bottomMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
           }
           const topMat = modelViewer.model.materials.find(
-            (m) => m.name === TopmaterialName,
+            (m) => LidColorMaterials.includes(m.name),
           );
           if (topMat) {
             topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
@@ -945,29 +975,6 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     };
     tubReader.readAsDataURL(tubFile);
-  });
-
-  // Lid color picker live preview
-  topColor.addEventListener("input", function (e) {
-    const pickedColor = e.target.value;
-    if (modelViewer.model) {
-      const topMat = modelViewer.model.materials.find(
-        (m) => m.name === TopmaterialName,
-      );
-      if (topMat) {
-        const rgb = hexToRgbArray(pickedColor);
-        topMat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1]);
-        // Also ensure it's not metallic/rough for a clean look
-        topMat.pbrMetallicRoughness.setMetallicFactor(0);
-        topMat.pbrMetallicRoughness.setRoughnessFactor(1);
-      }
-    }
-  });
-
-  // BG color picker live preview
-  bgColor.addEventListener("input", function (e) {
-    // Set 'background' to override the default radial-gradient in CSS
-    modelbg.style.background = e.target.value;
   });
 
   const selectAllToggle = document.getElementById("selectAllToggle");
@@ -1620,27 +1627,27 @@ window.addEventListener("DOMContentLoaded", () => {
             {
               name: "Main",
               src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.glb",
-              cameraOrbit: "0deg 75deg 0.45m",
-              minDist: 0.45,
-              maxDist: 0.45,
+              cameraOrbit: "0deg 75deg 0.50m",
+              minDist: 0.50,
+              maxDist: 0.50,
               image:
                 "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.png",
             },
             {
               name: "Front",
               src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-1.glb",
-              cameraOrbit: "0deg 75deg 0.65m",
-              minDist: 0.65,
-              maxDist: 0.65,
+              cameraOrbit: "0deg 75deg 0.60m",
+              minDist: 0.60,
+              maxDist: 0.60,
               image:
                 "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-1.png",
             },
             {
               name: "Side",
               src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-2.glb",
-              cameraOrbit: "0deg 75deg 0.65m",
-              minDist: 0.65,
-              maxDist: 0.65,
+              cameraOrbit: "0deg 75deg 0.70m",
+              minDist: 0.70,
+              maxDist: 0.70,
               image:
                 "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-2.png",
             },
@@ -1727,6 +1734,8 @@ window.addEventListener("DOMContentLoaded", () => {
           // Reset everything to default look when switching models
           lidColorManualSet = false;
           tubColorManualSet = false;
+          lidTransparencyManualSet = false;
+          tubTransparencyManualSet = false;
           lidTransparent.checked = false;
           tubTransparent.checked = false;
           resetTextureInputs();
@@ -1793,6 +1802,8 @@ window.addEventListener("DOMContentLoaded", () => {
         // Reset everything to default look when switching angles
         lidColorManualSet = false;
         tubColorManualSet = false;
+        lidTransparencyManualSet = false;
+        tubTransparencyManualSet = false;
         lidTransparent.checked = false;
         tubTransparent.checked = false;
         resetTextureInputs();
@@ -2325,8 +2336,16 @@ window.addEventListener("DOMContentLoaded", () => {
         const modelTitle = card.dataset.title || "Untitled";
         const tubTextureDataURL = card.dataset.textureDataUrl;
         const lidTextureDataURL = card.dataset.lidTextureDataUrl;
-        const topMaterialColor = card.dataset.topMaterialColor || "#ffffff";
-        const tubMaterialColor = card.dataset.tubMaterialColor || "#ffffff";
+        const topMaterialColor =
+          card.dataset.topMaterialColor &&
+          card.dataset.topMaterialColor !== "null"
+            ? card.dataset.topMaterialColor
+            : null;
+        const tubMaterialColor =
+          card.dataset.tubMaterialColor &&
+          card.dataset.tubMaterialColor !== "null"
+            ? card.dataset.tubMaterialColor
+            : null;
         const backgroundColor = card.dataset.backgroundColor || "#f5d2da";
         const modelSrcForCard = card.dataset.modelSrc;
         const snapshotDataURL = card.dataset.snapshot;

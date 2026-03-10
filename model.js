@@ -325,8 +325,6 @@ const MODEL_CATEGORIES = {
   ],
 };
 
-
-
 /********** STATE **********/
 const state = {
   selectedIndex: 0,
@@ -656,10 +654,10 @@ async function selectModel(index) {
     console.log(
       "[CategorySwitch] Reverting edited pattern to last library pattern.",
     );
-    state.patternUrl = state.lastLibraryPatternUrl;
+    state.patternUrl = null; // Clear pattern
+    state.logoDataUrl = null; // Clear uploaded logo
     state.isEdited = false;
     state.hideLogo = false;
-    state.logoDataUrl = null;
     state.lastLogoState = null;
 
     // Update UI toggle
@@ -671,6 +669,23 @@ async function selectModel(index) {
 
   state.selectedIndex = index;
   markSelectedThumbnail(index);
+
+  // Clear any uploaded logo and reset state
+  const hadCustomLogo = !!state.logoDataUrl;
+  state.logoDataUrl = null;
+  if (logoInput) logoInput.value = "";
+
+  // If we had a custom logo, we must refresh thumbnails to restore their default GLB look
+  // because setTexture(null) removes the baked-in logo. Reloading is the only way to revert.
+  if (hadCustomLogo && state.modelViewers) {
+    state.modelViewers.forEach((v) => {
+      if (v && v.src) {
+        const base = v.src.split("?")[0];
+        v.src = base + "?t=" + Date.now();
+      }
+    });
+  }
+
   const selectedModel = state.thumbnails[index];
   if (!mainViewer) return;
 
@@ -764,7 +779,7 @@ async function selectModel(index) {
         console.log("Model fully available:", selectedModel.name);
 
         // 🧹 RESET ALL MATERIALS on the new model first
-        ["lid_label", "tub_label", "Logo"].forEach((matName) => {
+        ["lid_label", "tub_label"].forEach((matName) => {
           clearMaterialTexture(mainViewer, matName);
         });
 
@@ -1450,16 +1465,14 @@ function startPatternCycle(
       if (sw) typeFromSwatch = sw.dataset.patternType;
 
       let targets = [];
+      const isTE_Model =
+        modelAlt.includes("te") ||
+        modelAlt.includes("tamper evident") ||
+        modelAlt.includes("sweet box te");
+
       if (isBox) {
-        const isTE = modelAlt.includes("te");
-        if (typeFromSwatch === "top")
-          targets = isTE
-            ? RECTANGLE_PATTERN_MATERIAL_NAME
-            : RECTANGLE_PATTERN_MATERIAL_NAME;
-        // Both now use Lid for Top
-        else if (typeFromSwatch === "bottom")
-          targets = isTE ? PATTERN_MATERIAL_NAME : PATTERN_MATERIAL_NAME;
-        // Both now use Tub for Bottom
+        if (typeFromSwatch === "top") targets = RECTANGLE_PATTERN_MATERIAL_NAME;
+        else if (typeFromSwatch === "bottom") targets = PATTERN_MATERIAL_NAME;
         else
           targets = [
             ...RECTANGLE_PATTERN_MATERIAL_NAME,
@@ -1472,8 +1485,6 @@ function startPatternCycle(
       }
 
       if (shouldApply) {
-        const isTE = modelAlt.includes("te");
-
         const applyOne = async (pUrl, pType) => {
           if (!pUrl) return;
           let matNames = [];
@@ -1490,7 +1501,12 @@ function startPatternCycle(
           const isLidMat = RECTANGLE_PATTERN_MATERIAL_NAME.some((n) =>
             matNames.includes(n),
           );
-          if (isBox && isTE && isLidMat) {
+          const isTE_Model =
+            modelAlt.includes("te") ||
+            modelAlt.includes("tamper evident") ||
+            modelAlt.includes("sweet box te");
+
+          if (isBox && isTE_Model && isLidMat) {
             rot = 90;
           }
 
@@ -1500,14 +1516,7 @@ function startPatternCycle(
           }).catch(() => {});
         };
 
-        // Determine if this is a grouped swatch
-        const sw = Array.from(
-          document.querySelectorAll(".pattern-swatch"),
-        ).find(
-          (el) =>
-            el.dataset.patternUrl?.split("?")[0] === patternUrl.split("?")[0],
-        );
-
+        // Use the existing 'sw' variable found earlier
         if (sw && sw.dataset.patternType === "full") {
           applyOne(patternUrl, "bottom");
           applyOne(sw.dataset.patternUrlTop, "top");
@@ -1586,12 +1595,14 @@ function isRectangleModel(name) {
 // Utility: Clear texture from a material
 function clearMaterialTexture(viewer, materialName) {
   if (!viewer || !viewer.model) return;
-  const names = Array.isArray(materialName) ? materialName : [materialName];
+  const names = (
+    Array.isArray(materialName) ? materialName : [materialName]
+  ).map((n) => n.toLowerCase());
 
-  names.forEach((n) => {
-    const material = viewer.model.materials.find((m) => m.name === n);
+  viewer.model.materials.forEach((material) => {
+    const matName = material.name.toLowerCase();
     if (
-      material &&
+      names.some((n) => matName === n) &&
       material.pbrMetallicRoughness &&
       material.pbrMetallicRoughness.baseColorTexture
     ) {
@@ -1680,9 +1691,13 @@ async function applyPatternToAll(
       modelAlt.includes("sweetbox") ||
       modelAlt.includes("square");
 
+    const isTE_Model =
+      modelAlt.includes("te") ||
+      modelAlt.includes("tamper evident") ||
+      modelAlt.includes("sweet box te");
+
     let targets = [];
     if (isBox) {
-      const isTE = modelAlt.includes("te");
       if (state.currentPatternType === "top")
         targets = RECTANGLE_PATTERN_MATERIAL_NAME;
       else if (state.currentPatternType === "bottom")
@@ -1700,7 +1715,6 @@ async function applyPatternToAll(
 
     const applyOne = async (pUrl, pType) => {
       if (!pUrl) return;
-      const isTE = modelAlt.includes("te");
       let matNames = [];
       if (isBox) {
         matNames =
@@ -1712,12 +1726,20 @@ async function applyPatternToAll(
           ? RECTANGLE_PATTERN_MATERIAL_NAME
           : PATTERN_MATERIAL_NAME;
       }
-      let rot =
+      let rot = 0;
+      // Robust check for Tamper Evident models
+      const isTE_Model =
+        modelAlt.includes("te") ||
+        modelAlt.includes("tamper evident") ||
+        modelAlt.includes("sweet box te");
+
+      if (
         isBox &&
-        isTE &&
+        isTE_Model &&
         RECTANGLE_PATTERN_MATERIAL_NAME.some((n) => matNames.includes(n))
-          ? 90
-          : 0;
+      ) {
+        rot = 90; // Apply 90 degree rotation to align texture on TE models
+      }
       await tryApplyMaterialTexture(viewer, matNames, pUrl, {
         skipWait: true,
         rotation: rot,
@@ -1800,9 +1822,10 @@ async function tryApplyMaterialTexture(
   const names = (
     Array.isArray(materialNames) ? materialNames : [materialNames]
   ).map((n) => n.toLowerCase());
-  const matchingMaterials = (viewer.model?.materials || []).filter((m) =>
-    names.includes(m.name.toLowerCase()),
-  );
+  const matchingMaterials = (viewer.model?.materials || []).filter((m) => {
+    const matName = m.name.toLowerCase();
+    return names.some((n) => matName === n);
+  });
 
   if (matchingMaterials.length === 0) {
     console.warn(
@@ -1862,6 +1885,7 @@ async function tryApplyMaterialTexture(
 
       mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
       mat.setAlphaMode("BLEND");
+      mat.doubleSided = true;
     });
   } catch (err) {
     console.warn("Failed to apply texture:", err);
@@ -1888,8 +1912,11 @@ if (logoInput) {
           alt.includes("sweet box") ||
           alt.includes("sweetbox") ||
           alt.includes("square");
-        const isTE = alt.includes("te");
-        const rotation = isBox && isTE ? 90 : 0;
+        const isTE_Model =
+          alt.includes("te") ||
+          alt.includes("tamper evident") ||
+          alt.includes("sweet box te");
+        const rotation = isBox && isTE_Model ? 90 : 0;
         return tryApplyMaterialTexture(
           v,
           LOGO_MATERIAL_NAME,
@@ -1904,7 +1931,7 @@ if (logoInput) {
 }
 
 const modelContainer = document.getElementById("modelcontainer");
-modelContainer.style.backgroundColor = "pink";
+// modelContainer.style.backgroundColor = "pink"; // Removed debug color
 
 // Elements
 const mainbg = document.getElementById("modelcontainer");
@@ -2316,7 +2343,6 @@ function addLogoToCanvas(dataUrl) {
   );
 }
 
-
 // Open modal and initialize everything
 editBtn.addEventListener("click", async () => {
   if (state.patternCycleTimer) {
@@ -2528,11 +2554,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     zoomInBtn.addEventListener("click", () => {
       const viewer = getViewer();
       if (!viewer) return;
-      
+
       // Use FOV for smoother "optical" zoom that doesn't jump position
       let currentFOV = parseFloat(viewer.fieldOfView);
       if (isNaN(currentFOV)) currentFOV = 30; // Default fallback for 'auto'
-      
+
       const newFOV = Math.max(5, currentFOV * 0.8);
       viewer.fieldOfView = `${newFOV}deg`;
     });
@@ -2542,10 +2568,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     zoomOutBtn.addEventListener("click", () => {
       const viewer = getViewer();
       if (!viewer) return;
-      
+
       let currentFOV = parseFloat(viewer.fieldOfView);
       if (isNaN(currentFOV)) currentFOV = 30;
-      
+
       const newFOV = Math.min(60, currentFOV * 1.2);
       viewer.fieldOfView = `${newFOV}deg`;
     });
@@ -2632,13 +2658,23 @@ function toggleLogoVisibility(hide) {
     );
 
     logoMaterials.forEach((logoMat) => {
+      // If we are showing the logo and there's no custom logo data,
+      // we should stay away from the material to preserve GLB defaults.
+      if (!hide && !state.logoDataUrl) {
+        // Optional: Reset to opaque if and only if we had previously messed with it.
+        // But on model switch, the material is fresh anyway.
+        return;
+      }
+
       // Force BLEND mode to support transparency and avoid black quads
       logoMat.setAlphaMode("BLEND");
+      logoMat.doubleSided = true;
 
       if (hide) {
         // Transparent
         logoMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
       } else {
+        // Custom Logo Case (state.logoDataUrl is present)
         // Fully visible + White factor (preserves original texture colors)
         logoMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
       }
