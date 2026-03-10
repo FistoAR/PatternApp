@@ -58,7 +58,7 @@ window.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("resize", updateScrollButtons);
   }
 
-  const modelSrc = "./assets/model.glb";
+  const modelSrc = "./assets/Angles/round-containers/120ml-round/120ml-main.glb";
   const TubColorMaterials = ["tub", "Tub", "bottom"];
   const LidColorMaterials = ["lid", "Lid", "top"];
   const TubTextureMaterials = ["tub_label", "bottom_label"];

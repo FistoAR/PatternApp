@@ -325,78 +325,7 @@ const MODEL_CATEGORIES = {
   ],
 };
 
-const MODEL_CATEGORIES_WITHOUT_LOGO = {
-  Round: [
-    {
-      name: "120ml Round Container",
-      path: "./assets/Model_without_logo/120ml round without logo.glb",
-    },
-    {
-      name: "250ml Round Container",
-      path: "./assets/Model_without_logo/250ml round without logo.glb",
-    },
-    {
-      name: "300ml Round Container",
-      path: "./assets/Model_without_logo/300ml round without logo.glb",
-    },
-    {
-      name: "500ml Round Container",
-      path: "./assets/Model_without_logo/500ml Round  without logo.glb",
-    },
-    {
-      name: "750ml Round Container",
-      path: "./assets/Model_without_logo/750ml round without logo.glb",
-    },
-    {
-      name: "1000ml Round Container",
-      path: "./assets/Model_without_logo/1000ml round without logo.glb",
-    },
-  ],
-  "Round Square": [
-    {
-      name: "450ml/500gms Container",
-      path: "./assets/Model_without_logo/450ml cont without logo.glb",
-    },
-    {
-      name: "500ml Container",
-      path: "./assets/Model_without_logo/500ml cont without logo.glb",
-    },
-  ],
-  Rectangle: [
-    {
-      name: "500ml Rectangular Container",
-      path: "./assets/Model_without_logo/500ml Rect without logo.glb",
-    },
-    {
-      name: "650ml Rectangular Container",
-      path: "./assets/Model_without_logo/650ml Rect without logo.glb",
-    },
-    {
-      name: "750ml Rectangular Container",
-      path: "./assets/Model_without_logo/750ml Rect without logo.glb",
-    },
-  ],
-  "Sweet Box": [
-    {
-      name: "250gms Sweet Box",
-      path: "./assets/Model_without_logo/250gms SB without logo.glb",
-    },
-    {
-      name: "500gms Sweet Box",
-      path: "./assets/Model_without_logo/500gms SB without logo.glb",
-    },
-  ],
-  "Sweet Box Tamper Evident": [
-    {
-      name: "250gms Sweet Box Tamper Evident",
-      path: "./assets/Model_without_logo/TE 250 sb without logo.glb",
-    },
-    {
-      name: "500gms Sweet Box Tamper Evident",
-      path: "./assets/Model_without_logo/TE 500 sb without logo.glb",
-    },
-  ],
-};
+
 
 /********** STATE **********/
 const state = {
@@ -2387,25 +2316,6 @@ function addLogoToCanvas(dataUrl) {
   );
 }
 
-function getModelWithoutLogoPath(selectedIndex) {
-  const selectedModelName = state.thumbnails[selectedIndex]?.name;
-  if (!selectedModelName) return null;
-
-  for (const models of Object.values(MODEL_CATEGORIES_WITHOUT_LOGO)) {
-    const found = models.find((m) => m.name === selectedModelName);
-    if (found) return found.path;
-  }
-  return null;
-}
-
-function getWithLogoModelPathByName(name) {
-  if (!name) return null;
-  for (const models of Object.values(MODEL_CATEGORIES)) {
-    const found = models.find((m) => m.name === name);
-    if (found) return found.path;
-  }
-  return null;
-}
 
 // Open modal and initialize everything
 editBtn.addEventListener("click", async () => {
@@ -2420,30 +2330,9 @@ editBtn.addEventListener("click", async () => {
 
   // NOTE: do not clear logoDataUrl here, we want it to potentially persist or be restored via lastLogoState
 
-  // Get "without logo" model path based on current selection
-  const withoutLogoPath = getModelWithoutLogoPath(state.selectedIndex);
-  if (withoutLogoPath && mainViewer) {
-    const encoded =
-      encodeURI(withoutLogoPath) +
-      (withoutLogoPath.includes("?") ? "&" : "?") +
-      "t=" +
-      Date.now();
-
-    // Listen for model load event before applying colors
-    mainViewer.addEventListener(
-      "load",
-      () => {
-        // Apply lid and tub colors after model is fully loaded
-        Object.entries(state.selectedColors).forEach(([part, color]) => {
-          updateMaterialColor(part, color, { skipWait: true });
-        });
-      },
-      { once: true },
-    );
-
-    mainViewer.src = encoded;
-    state.isWithoutLogoModel = true; // set true when loading without logo model
-  }
+  // Hide baked-in logo while editing
+  toggleLogoVisibility(true);
+  state.isWithoutLogoModel = true;
 
   if (modal) modal.classList.add("show");
 
@@ -2484,67 +2373,9 @@ if (closeModal) {
   closeModal.addEventListener("click", () => {
     if (modal) modal.classList.remove("show");
 
-    const currentIndex = state.selectedIndex;
-    const selectedModelName = state.thumbnails[currentIndex]?.name;
-
-    if (!selectedModelName || !mainViewer) return;
-
-    // Determine the model path to restore (WITH logo)
-    let pathWithLogo = null;
-
-    if (state.isWithoutLogoModel) {
-      // If currently on without logo model, restore the corresponding with logo path
-      pathWithLogo = getWithLogoModelPathByName(selectedModelName);
-    } else {
-      // Otherwise just use original selected thumbnail path
-      pathWithLogo = state.thumbnails[currentIndex]?.path;
-    }
-
-    if (!pathWithLogo) return;
-
-    const encoded =
-      encodeURI(pathWithLogo) +
-      (pathWithLogo.includes("?") ? "&" : "?") +
-      "t=" +
-      Date.now();
-
-    // Apply textures and colors AFTER model loads
-    mainViewer.addEventListener(
-      "load",
-      async () => {
-        const isRect = isRectangleModel(mainViewer.alt || "");
-
-        // 1. Restore patterns (both lid and tub)
-        if (state.patternUrl) {
-          await applyPatternToAll(state.patternUrl, {
-            patternUrlTop: state.patternUrlTop,
-            forceReload: true,
-            isEdited: state.isEdited,
-          });
-        }
-
-        // 2. Restore custom logo if it existed
-        if (state.logoDataUrl) {
-          await tryApplyMaterialTexture(
-            mainViewer,
-            LOGO_MATERIAL_NAME,
-            state.logoDataUrl,
-          );
-        }
-
-        // 3. Restore brand logo visibility and colors
-        toggleLogoVisibility(state.hideLogo);
-
-        Object.entries(state.selectedColors).forEach(([part, color]) => {
-          updateMaterialColor(part, color, { skipWait: true });
-        });
-
-        state.isWithoutLogoModel = false; // reset flag after restoring
-      },
-      { once: true },
-    );
-
-    mainViewer.src = encoded;
+    // Restore original logo visibility
+    toggleLogoVisibility(state.hideLogo);
+    state.isWithoutLogoModel = false;
 
     if (canvas) {
       if (logoImageObj) {
@@ -2589,69 +2420,33 @@ saveLogoBtn.addEventListener("click", async () => {
     state.lastLogoState = null;
   }
 
-  // ✅ RESTORE "WITH LOGO" model but HIDE the logo physically
-  const selectedModelName = state.thumbnails[state.selectedIndex]?.name;
-  const pathWithLogo = getWithLogoModelPathByName(selectedModelName);
+  // 1. Hide the baked-in brand logo
+  state.hideLogo = true;
+  const hideLogoToggle = document.getElementById("hideLogoToggle");
+  if (hideLogoToggle) hideLogoToggle.checked = true;
+  toggleLogoVisibility(true);
 
-  if (pathWithLogo && mainViewer) {
-    const encoded =
-      encodeURI(pathWithLogo) +
-      (pathWithLogo.includes("?") ? "&" : "?") +
-      "t=" +
-      Date.now();
-
-    mainViewer.addEventListener(
-      "load",
-      async () => {
-        // 1. Hide the baked-in brand logo
-        state.hideLogo = true;
-        const hideLogoToggle = document.getElementById("hideLogoToggle");
-        if (hideLogoToggle) hideLogoToggle.checked = true;
-        toggleLogoVisibility(true);
-
-        // 2. Apply patterns (re-applying both lid and tub to ensure nothing is lost)
-        const isRect = isRectangleModel(mainViewer.alt);
-        if (isRect) {
-          state.patternUrlTop = dataUrl;
-        } else {
-          state.patternUrl = dataUrl;
-        }
-        state.isEdited = true;
-
-        await applyPatternToAll(state.patternUrl, {
-          patternUrlTop: state.patternUrlTop,
-          isEdited: true,
-          forceReload: true,
-        });
-
-        // 3. Restore colors
-        Object.entries(state.selectedColors).forEach(([part, color]) => {
-          updateMaterialColor(part, color, { skipWait: true });
-        });
-
-        state.isWithoutLogoModel = false;
-      },
-      { once: true },
-    );
-
-    mainViewer.src = encoded;
+  // 2. Apply patterns (re-applying both lid and tub to ensure nothing is lost)
+  const isRect = isRectangleModel(mainViewer.alt);
+  if (isRect) {
+    state.patternUrlTop = dataUrl;
   } else {
-    console.error(
-      "[Save] Could not find with-logo path for:",
-      selectedModelName,
-    );
-    // Fallback: Apply to current model directly
-    const matName = isRectangleModel(mainViewer.alt)
-      ? RECTANGLE_PATTERN_MATERIAL_NAME
-      : PATTERN_MATERIAL_NAME;
     state.patternUrl = dataUrl;
-    state.isEdited = true;
-    await tryApplyMaterialTexture(mainViewer, matName, dataUrl, {
-      forceReload: true,
-    });
-    state.hideLogo = true;
   }
+  state.isEdited = true;
 
+  await applyPatternToAll(state.patternUrl, {
+    patternUrlTop: state.patternUrlTop,
+    isEdited: true,
+    forceReload: true,
+  });
+
+  // 3. Restore colors
+  Object.entries(state.selectedColors).forEach(([part, color]) => {
+    updateMaterialColor(part, color, { skipWait: true });
+  });
+
+  state.isWithoutLogoModel = false;
   // Modal and UI cleanup
   modal.classList.remove("show");
   if (logoImageObj) {
