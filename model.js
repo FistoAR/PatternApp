@@ -2583,11 +2583,9 @@ function toggleLogoVisibility(hide) {
   viewers.forEach((viewer) => {
     if (!viewer || !viewer.model) return;
 
-    // Find ALL materials that contain "logo" just to be safe
+    // Target the specific logo material only
     const logoMaterials = viewer.model.materials.filter(
-      (m) =>
-        m.name.toLowerCase().includes("logo") ||
-        m.name.toLowerCase() === LOGO_MATERIAL_NAME.toLowerCase(),
+      (m) => m.name.toLowerCase() === LOGO_MATERIAL_NAME.toLowerCase(),
     );
 
     logoMaterials.forEach((logoMat) => {
