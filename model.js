@@ -2517,6 +2517,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Zoom & Reset Logic
+  const zoomInBtn = document.getElementById("zoomInBtn");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+  const resetViewBtn = document.getElementById("resetViewBtn");
+
+  const getViewer = () => document.getElementById("mainViewer");
+
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      const viewer = getViewer();
+      if (!viewer) return;
+      
+      // Use FOV for smoother "optical" zoom that doesn't jump position
+      let currentFOV = parseFloat(viewer.fieldOfView);
+      if (isNaN(currentFOV)) currentFOV = 30; // Default fallback for 'auto'
+      
+      const newFOV = Math.max(5, currentFOV * 0.8);
+      viewer.fieldOfView = `${newFOV}deg`;
+    });
+  }
+
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      const viewer = getViewer();
+      if (!viewer) return;
+      
+      let currentFOV = parseFloat(viewer.fieldOfView);
+      if (isNaN(currentFOV)) currentFOV = 30;
+      
+      const newFOV = Math.min(60, currentFOV * 1.2);
+      viewer.fieldOfView = `${newFOV}deg`;
+    });
+  }
+
+  if (resetViewBtn) {
+    resetViewBtn.addEventListener("click", () => {
+      const viewer = getViewer();
+      if (!viewer) return;
+      viewer.cameraOrbit = "0deg 75deg auto";
+      viewer.fieldOfView = "auto";
+    });
+  }
+
   // Auto Apply Toggle Logic
   const autoApplyToggle = document.getElementById("autoApplyToggle");
   if (autoApplyToggle) {

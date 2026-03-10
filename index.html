@@ -184,7 +184,20 @@
                 disable-pan
                 ar
                 interaction-prompt="none"
+                min-field-of-view="5deg"
+                max-field-of-view="65deg"
               >
+                <div class="viewer-controls glass-group">
+                  <button id="zoomOutBtn" class="control-btn" title="Zoom Out">
+                    <i class="fa-solid fa-minus"></i>
+                  </button>
+                  <button id="resetViewBtn" class="control-btn" title="Reset View">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                  </button>
+                  <button id="zoomInBtn" class="control-btn" title="Zoom In">
+                    <i class="fa-solid fa-plus"></i>
+                  </button>
+                </div>
               </model-viewer>
             </div>
           </div>

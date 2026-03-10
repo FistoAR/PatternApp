@@ -248,3 +248,58 @@
 .rotate-switch input:checked + .rotate-slider:before {
   transform: translateX(1.2vw);
 }
+
+/* Viewer Controls (Zoom & Reset) */
+.viewer-controls {
+  position: absolute;
+  bottom: 1.5vw;
+  right: 1.5vw; /* Moved to rightside end */
+  display: flex;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.glass-group {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0.3vw;
+  border-radius: 5vw;
+  border: 0.1vw solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0.4vw 1.2vw rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 0.4vw;
+  pointer-events: auto;
+}
+
+.control-btn {
+  width: 2.15vw;
+  height: 2.15vw;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.9vw;
+  color: #444;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0.1vw 0.3vw rgba(0,0,0,0.08);
+}
+
+.control-btn:hover {
+  background: #fbd238;
+  color: white;
+  transform: scale(1.1);
+}
+
+.control-btn:active {
+  transform: scale(0.92);
+}
+
+.control-btn i {
+  pointer-events: none;
+}
+
