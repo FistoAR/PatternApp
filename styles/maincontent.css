@@ -290,7 +290,7 @@
 }
 
 .control-btn:hover {
-  background: #fbd238;
+  background: #997d18;
   color: white;
   transform: scale(1.1);
 }
@@ -302,4 +302,4 @@
 .control-btn i {
   pointer-events: none;
 }
-
+
