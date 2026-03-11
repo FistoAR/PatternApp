@@ -58,7 +58,8 @@ window.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("resize", updateScrollButtons);
   }
 
-  const modelSrc = "./assets/Angles/round-containers/120ml-round/120ml-main.glb";
+  const modelSrc =
+    "./assets/Angles/round-containers/120ml-round/120ml-main.glb";
   const TubColorMaterials = ["tub", "Tub", "bottom"];
   const LidColorMaterials = ["lid", "Lid", "top"];
   const TubTextureMaterials = ["tub_label", "bottom_label"];
@@ -421,7 +422,10 @@ window.addEventListener("DOMContentLoaded", () => {
               defaults.baseColorFactor[1],
               defaults.baseColorFactor[2],
             ];
-            alpha = defaults.baseColorFactor[3] < 1.0 ? defaults.baseColorFactor[3] : 0.36;
+            alpha =
+              defaults.baseColorFactor[3] < 1.0
+                ? defaults.baseColorFactor[3]
+                : 0.36;
           }
 
           mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, alpha]);
@@ -430,8 +434,12 @@ window.addEventListener("DOMContentLoaded", () => {
             colorArray[1] * 0.4,
             colorArray[2] * 0.4,
           ]);
-          mat.pbrMetallicRoughness.setMetallicFactor(colorHex ? 0.8 : defaults.metallicFactor);
-          mat.pbrMetallicRoughness.setRoughnessFactor(colorHex ? 0.18 : defaults.roughnessFactor);
+          mat.pbrMetallicRoughness.setMetallicFactor(
+            colorHex ? 0.8 : defaults.metallicFactor,
+          );
+          mat.pbrMetallicRoughness.setRoughnessFactor(
+            colorHex ? 0.18 : defaults.roughnessFactor,
+          );
           mat.setAlphaMode("BLEND");
         } else if (colorHex) {
           // Applying Manual Opaque Color
@@ -947,8 +955,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
         // Reset model materials
         if (modelViewer.model) {
-          const bottomMat = modelViewer.model.materials.find(
-            (m) => TubColorMaterials.includes(m.name),
+          const bottomMat = modelViewer.model.materials.find((m) =>
+            TubColorMaterials.includes(m.name),
           );
           if (bottomMat) {
             bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(
@@ -956,8 +964,8 @@ window.addEventListener("DOMContentLoaded", () => {
             );
             bottomMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
           }
-          const topMat = modelViewer.model.materials.find(
-            (m) => LidColorMaterials.includes(m.name),
+          const topMat = modelViewer.model.materials.find((m) =>
+            LidColorMaterials.includes(m.name),
           );
           if (topMat) {
             topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
@@ -1628,8 +1636,8 @@ window.addEventListener("DOMContentLoaded", () => {
               name: "Main",
               src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.glb",
               cameraOrbit: "0deg 75deg 0.50m",
-              minDist: 0.50,
-              maxDist: 0.50,
+              minDist: 0.5,
+              maxDist: 0.5,
               image:
                 "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-main.png",
             },
@@ -1637,8 +1645,8 @@ window.addEventListener("DOMContentLoaded", () => {
               name: "Front",
               src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-1.glb",
               cameraOrbit: "0deg 75deg 0.60m",
-              minDist: 0.60,
-              maxDist: 0.60,
+              minDist: 0.6,
+              maxDist: 0.6,
               image:
                 "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-1.png",
             },
@@ -1646,8 +1654,8 @@ window.addEventListener("DOMContentLoaded", () => {
               name: "Side",
               src: "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-2.glb",
               cameraOrbit: "0deg 75deg 0.70m",
-              minDist: 0.70,
-              maxDist: 0.70,
+              minDist: 0.7,
+              maxDist: 0.7,
               image:
                 "./assets/Angles/Sweet-Box-TE/500g-sweet-box-te/500g-sweet-box-te-angle-2.png",
             },
@@ -2611,7 +2619,7 @@ window.addEventListener("DOMContentLoaded", () => {
       renderedImages.innerHTML = ""; // Clear the UI container
       updateSelectionInfo(); // Update the export button state and label
       toggleClearButtonState(); // Update the clear all button state
-      
+
       // Refresh page after 1 second to ensure user sees success and then starts fresh
       setTimeout(() => {
         location.reload();
@@ -2730,7 +2738,7 @@ window.addEventListener("DOMContentLoaded", () => {
       loadingOverlay.style.display = "none";
       downloadModelBtn.disabled = false;
       downloadModelBtn.innerHTML = originalContent;
-      
+
       // Refresh page after 1 second
       setTimeout(() => {
         location.reload();

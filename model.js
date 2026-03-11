@@ -565,6 +565,9 @@ function filterPatternAccordion(shapeFilter, keepCycleIndex = false) {
         if (sw.style.display !== "none") typeVisible = true;
       });
       header.style.display = typeVisible ? "block" : "none";
+      if (header.parentElement && header.parentElement.classList.contains("pattern-group")) {
+        header.parentElement.style.display = typeVisible ? "flex" : "none";
+      }
     });
 
     // Hide the entire category if no patterns match the shape
@@ -950,6 +953,14 @@ async function initCategoryAccordion() {
 
     // Build swatches grouped by type
     if (catPatterns.length) {
+      const noteMsg = document.createElement("div");
+      noteMsg.textContent = "Stop auto apply pattern to double click to view pattern";
+      noteMsg.style.fontSize = "0.7vw";
+      noteMsg.style.color = "#888";
+      noteMsg.style.fontStyle = "italic";
+      noteMsg.style.padding = "0.5vw 0.5vw 0 0.5vw";
+      content.appendChild(noteMsg);
+
       const lidGroup = document.createElement("div");
       lidGroup.className = "pattern-group";
       const lidHeader = document.createElement("div");
@@ -997,19 +1008,55 @@ async function initCategoryAccordion() {
           sw.dataset.shape = canonicalShape;
           sw.dataset.patternType = "full";
 
+          sw.addEventListener("dblclick", () => {
+            const autoApplyToggle = document.getElementById("autoApplyToggle");
+            if (autoApplyToggle && autoApplyToggle.checked) return;
+            openPatternFullView(urlBottom, urlTop);
+          });
+
           sw.addEventListener("click", async () => {
             stopPatternCycle();
 
-            if (state.isEdited) {
-              const confirmed = await showConfirmModal(
-                "Your edited pattern will be lost. Are you sure you want to select a new library pattern?",
-              );
+            if (state.isEdited || state.isWithoutLogoModel) {
+              let confirmed = false;
+              if (state.isEdited) {
+                confirmed = await showConfirmModal(
+                  "Your edited pattern will be lost. Are you sure you want to select a new library pattern?",
+                );
+              } else if (state.isWithoutLogoModel) {
+                confirmed = await showConfirmModal(
+                  "Selecting a new pattern will remove your custom logo. Proceed?",
+                );
+              }
+
               if (!confirmed) return;
-            } else if (state.isWithoutLogoModel) {
-              const confirmed = await showConfirmModal(
-                "Selecting a new pattern will remove your custom logo. Proceed?",
-              );
-              if (!confirmed) return;
+
+              // After user clicks OK, explicitly clear the logo
+              state.logoDataUrl = null;
+              state.lastLogoState = null;
+              state.hideLogo = false;
+              state.isWithoutLogoModel = false;
+              
+              const logoInp = document.getElementById("logoUpload");
+              if (logoInp) logoInp.value = "";
+              
+              const hideLogoToggle = document.getElementById("hideLogoToggle");
+              if (hideLogoToggle) hideLogoToggle.checked = false;
+              
+              // Re-enable visibility (if it was just hidden)
+              toggleLogoVisibility(false);
+              
+              // If a custom 3D material logo was applied, clearing requires model reload to get baked-in texture back
+              // But we can just clear it visually or reload it. The easiest is calling clearMaterialTexture to wipe the override.
+              // But wait, clearMaterialTexture removes the baked-in one too. 
+              // We'll just leave it un-overridden for now, or reload if necessary. 
+              // Actually, since we're applying a new pattern and the user explicitly asked to clear the logo:
+              const allViewers = Array.from(new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)));
+              allViewers.forEach(v => {
+                if(v && v.src && v.src.includes("?t=")) {
+                  v.src = v.src.split("?")[0] + "?t=" + Date.now();
+                }
+              });
             }
             state.currentPatternType = "full";
             // Apply both in parallel
@@ -1047,19 +1094,49 @@ async function initCategoryAccordion() {
             sw.dataset.shape = canonicalShape;
             sw.dataset.patternType = patObj.type;
 
+            sw.addEventListener("dblclick", () => {
+              const autoApplyToggle = document.getElementById("autoApplyToggle");
+              if (autoApplyToggle && autoApplyToggle.checked) return;
+              openPatternFullView(patObj.type === "bottom" ? url : null, patObj.type === "top" ? url : null);
+            });
+
             sw.addEventListener("click", async () => {
               stopPatternCycle();
 
-              if (state.isEdited) {
-                const confirmed = await showConfirmModal(
-                  "Your edited pattern will be lost. Are you sure you want to select a new library pattern?",
-                );
+              if (state.isEdited || state.isWithoutLogoModel) {
+                let confirmed = false;
+                if (state.isEdited) {
+                  confirmed = await showConfirmModal(
+                    "Your edited pattern will be lost. Are you sure you want to select a new library pattern?",
+                  );
+                } else if (state.isWithoutLogoModel) {
+                  confirmed = await showConfirmModal(
+                    "Selecting a new pattern will remove your custom logo. Proceed?",
+                  );
+                }
+
                 if (!confirmed) return;
-              } else if (state.isWithoutLogoModel) {
-                const confirmed = await showConfirmModal(
-                  "Selecting a new pattern will remove your custom logo. Proceed?",
-                );
-                if (!confirmed) return;
+
+                // After user clicks OK, explicitly clear the logo
+                state.logoDataUrl = null;
+                state.lastLogoState = null;
+                state.hideLogo = false;
+                state.isWithoutLogoModel = false;
+                
+                const logoInp = document.getElementById("logoUpload");
+                if (logoInp) logoInp.value = "";
+                
+                const hideLogoToggle = document.getElementById("hideLogoToggle");
+                if (hideLogoToggle) hideLogoToggle.checked = false;
+                
+                toggleLogoVisibility(false);
+                
+                const allViewers = Array.from(new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)));
+                allViewers.forEach(v => {
+                  if(v && v.src && v.src.includes("?t=")) {
+                    v.src = v.src.split("?")[0] + "?t=" + Date.now();
+                  }
+                });
               }
               state.currentPatternType = patObj.type;
               await applyPatternToAll(url);
@@ -1070,6 +1147,10 @@ async function initCategoryAccordion() {
           });
         }
       });
+
+      if (lidGroup.children.length <= 1) lidGroup.style.display = "none";
+      if (tubGroup.children.length <= 1) tubGroup.style.display = "none";
+      if (fullGroup.children.length <= 1) fullGroup.style.display = "none";
 
       content.appendChild(lidGroup);
       content.appendChild(tubGroup);
@@ -1498,17 +1579,6 @@ function startPatternCycle(
           }
 
           let rot = 0;
-          const isLidMat = RECTANGLE_PATTERN_MATERIAL_NAME.some((n) =>
-            matNames.includes(n),
-          );
-          const isTE_Model =
-            modelAlt.includes("te") ||
-            modelAlt.includes("tamper evident") ||
-            modelAlt.includes("sweet box te");
-
-          if (isBox && isTE_Model && isLidMat) {
-            rot = 90;
-          }
 
           tryApplyMaterialTexture(viewer, matNames, pUrl, {
             skipWait: true,
@@ -1727,19 +1797,6 @@ async function applyPatternToAll(
           : PATTERN_MATERIAL_NAME;
       }
       let rot = 0;
-      // Robust check for Tamper Evident models
-      const isTE_Model =
-        modelAlt.includes("te") ||
-        modelAlt.includes("tamper evident") ||
-        modelAlt.includes("sweet box te");
-
-      if (
-        isBox &&
-        isTE_Model &&
-        RECTANGLE_PATTERN_MATERIAL_NAME.some((n) => matNames.includes(n))
-      ) {
-        rot = 90; // Apply 90 degree rotation to align texture on TE models
-      }
       await tryApplyMaterialTexture(viewer, matNames, pUrl, {
         skipWait: true,
         rotation: rot,
@@ -1824,7 +1881,10 @@ async function tryApplyMaterialTexture(
   ).map((n) => n.toLowerCase());
   const matchingMaterials = (viewer.model?.materials || []).filter((m) => {
     const matName = m.name.toLowerCase();
-    return names.some((n) => matName === n);
+    return names.some((n) => {
+      if (n === "logo") return matName === "logo";
+      return matName.includes(n);
+    });
   });
 
   if (matchingMaterials.length === 0) {
@@ -1884,7 +1944,8 @@ async function tryApplyMaterialTexture(
       }
 
       mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-      mat.setAlphaMode("BLEND");
+      mat.setAlphaMode("MASK");
+      mat.setAlphaCutoff(0.5);
       mat.doubleSided = true;
     });
   } catch (err) {
@@ -2658,25 +2719,31 @@ function toggleLogoVisibility(hide) {
     );
 
     logoMaterials.forEach((logoMat) => {
-      // If we are showing the logo and there's no custom logo data,
-      // we should stay away from the material to preserve GLB defaults.
-      if (!hide && !state.logoDataUrl) {
-        // Optional: Reset to opaque if and only if we had previously messed with it.
-        // But on model switch, the material is fresh anyway.
-        return;
-      }
-
-      // Force BLEND mode to support transparency and avoid black quads
-      logoMat.setAlphaMode("BLEND");
+      // Always ensure the default glb logo is double sided to fix rotation culling bug
       logoMat.doubleSided = true;
 
+      // Use MASK mode to avoid z-fighting with transparent tub
+      logoMat.setAlphaMode("MASK");
+      logoMat.setAlphaCutoff(0.5);
+
+      const currentColor = logoMat.pbrMetallicRoughness.baseColorFactor;
       if (hide) {
         // Transparent
-        logoMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
+        logoMat.pbrMetallicRoughness.setBaseColorFactor([
+          currentColor[0],
+          currentColor[1],
+          currentColor[2],
+          0,
+        ]);
       } else {
-        // Custom Logo Case (state.logoDataUrl is present)
-        // Fully visible + White factor (preserves original texture colors)
-        logoMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+        // Show Logo
+        // If it's a built-in logo (no custom URL) or a custom logo, we must ensure it is visible
+        logoMat.pbrMetallicRoughness.setBaseColorFactor([
+          currentColor[0],
+          currentColor[1],
+          currentColor[2],
+          1,
+        ]);
       }
     });
   });
@@ -2728,5 +2795,65 @@ function showConfirmModal(
 
     okBtn.addEventListener("click", onOk);
     cancelBtn.addEventListener("click", onCancel);
+  });
+}
+
+/********** FULL VIEW PATTERN MODAL **********/
+let fullViewImages = [];
+let fullViewCurrentIndex = 0;
+
+function openPatternFullView(bottomUrl, topUrl) {
+  fullViewImages = [];
+  if (topUrl && bottomUrl) {
+    fullViewImages = [topUrl, bottomUrl]; // index 0 top (lid), index 1 bottom (tub)
+  } else if (topUrl) {
+    fullViewImages = [topUrl];
+  } else if (bottomUrl) {
+    fullViewImages = [bottomUrl];
+  }
+  
+  if (fullViewImages.length === 0) return;
+  
+  fullViewCurrentIndex = 0;
+  updateFullViewModal();
+  
+  const modal = document.getElementById("fullViewModal");
+  if (modal) {
+    modal.classList.add("show");
+    modal.style.display = "flex";
+  }
+}
+
+function updateFullViewModal() {
+  const img = document.getElementById("fullViewImage");
+  const nextBtn = document.getElementById("fullViewNextBtn");
+  
+  if (img) {
+    img.src = fullViewImages[fullViewCurrentIndex];
+  }
+  
+  if (nextBtn) {
+    if (fullViewImages.length > 1) {
+      nextBtn.style.display = "block";
+      nextBtn.textContent = fullViewCurrentIndex === 0 ? "Show Tub Image" : "Show Lid Image";
+      nextBtn.onclick = () => {
+        fullViewCurrentIndex = (fullViewCurrentIndex + 1) % fullViewImages.length;
+        updateFullViewModal();
+      };
+    } else {
+      nextBtn.style.display = "none";
+    }
+  }
+}
+
+// Close full view modal
+const closeFullViewBtn = document.getElementById("closeFullViewModal");
+if (closeFullViewBtn) {
+  closeFullViewBtn.addEventListener("click", () => {
+    const modal = document.getElementById("fullViewModal");
+    if (modal) {
+      modal.classList.remove("show");
+      modal.style.display = "none";
+    }
   });
 }

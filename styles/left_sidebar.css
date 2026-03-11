@@ -92,9 +92,7 @@
 .left_side_bar .accordion-content {
   max-height: 0;               /* collapsed */
   overflow: hidden;
-  transition: max-height 0.3s ease;
-  margin-left: 0.6vw;
-  padding: 0 10px !important;  /* Ensure 0 vertical padding when collapsed */
+  transition: max-height 0.3s ease;  
   display: block;              /* keep it block, control via max-height */
 }
 

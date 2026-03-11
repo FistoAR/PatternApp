@@ -126,6 +126,17 @@
               </div>
             </div>
           </div>
+
+          <!-- Full View Pattern Modal -->
+          <div id="fullViewModal" class="modal" style="z-index: 99999; background: rgba(0,0,0,0.85);">
+            <div style="position: absolute; top: 2vw; right: 2.5vw; font-size: 2vw; color: white; cursor: pointer; transition: color 0.2s; z-index: 2;" id="closeFullViewModal" onmouseover="this.style.color='#f00'" onmouseout="this.style.color='white'">
+              <i class="fa-solid fa-xmark"></i>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative;">
+              <img id="fullViewImage" src="" style="max-width: 90%; max-height: 80vh; object-fit: contain; box-shadow: 0 4px 25px rgba(0,0,0,0.5); border-radius: 0.5vw; background: white;" />
+              <button id="fullViewNextBtn" class="save_btn" style="margin-top: 1.5vw; display: none; font-size: 1vw; min-width: 12vw; padding: 0.8vw 1.5vw;">Show Tub Image</button>
+            </div>
+          </div>
         </div>
         <div class="main_content">
           <div class="model" id="modelcontainer">
@@ -158,7 +169,7 @@
               </div>
 
               <!-- Center: Model Name -->
-              <h3 id="mainModelTitle" style="margin: 0;">120ml Round Container</h3>
+              <h3 id="mainModelTitle" style="margin: 0; font-size: 15px;">120ml Round Container</h3>
 
               <!-- Right: Auto Rotate -->
               <div style="position: absolute; right: 1.5vw; display: flex; align-items: center; gap: 0.5vw;">
