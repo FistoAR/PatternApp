@@ -1523,11 +1523,11 @@ window.addEventListener("DOMContentLoaded", () => {
         {
           name: "500g Sweet Box",
           frontSrc:
-            "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-main.glb",
+            "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-main.glb",
           angles: [
             {
               name: "Main",
-              src: "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-main.glb",
+              src: "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-main.glb",
               cameraOrbit: "0deg 75deg 0.65m",
               minDist: 0.65,
               maxDist: 0.65,
@@ -1536,7 +1536,7 @@ window.addEventListener("DOMContentLoaded", () => {
             },
             {
               name: "Front",
-              src: "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-angle-1.glb",
+              src: "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-angle-1.glb",
               cameraOrbit: "0deg 75deg 0.85m",
               minDist: 0.85,
               maxDist: 0.85,
@@ -1545,7 +1545,7 @@ window.addEventListener("DOMContentLoaded", () => {
             },
             {
               name: "Side",
-              src: "./assets/Angles/sweet-Box/500g-sweet-box/500g-sweet-box-angle-2.glb",
+              src: "./assets/Angles/Sweet-Box/500g-sweet-box/500g-sweet-box-angle-2.glb",
               cameraOrbit: "0deg 75deg 0.85m",
               minDist: 0.85,
               maxDist: 0.85,
