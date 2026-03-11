@@ -252,75 +252,75 @@ const MODEL_CATEGORIES = {
   Round: [
     {
       name: "120ml Round Container",
-      path: "./assets/Model_with_logo/120ml round with logo.glb",
+      path: "./assets/Model_with_logo/120ml_round_with_logo.glb",
     },
     {
       name: "250ml Round Container",
-      path: "./assets/Model_with_logo/250ml round with logo.glb",
+      path: "./assets/Model_with_logo/250ml_round_with_logo.glb",
     },
     {
       name: "300ml Round Container",
-      path: "./assets/Model_with_logo/300ml round with logo.glb",
+      path: "./assets/Model_with_logo/300ml_round_with_logo.glb",
     },
     {
       name: "500ml Round Container",
-      path: "./assets/Model_with_logo/500ml Round  with logo.glb",
+      path: "./assets/Model_with_logo/500ml_round_with_logo.glb",
     },
     {
       name: "750ml Round Container",
-      path: "./assets/Model_with_logo/750ml Round with logo.glb",
+      path: "./assets/Model_with_logo/750ml_round_with_logo.glb",
     },
     {
       name: "1000ml Round Container",
-      path: "./assets/Model_with_logo/1000ml Round with logo.glb",
+      path: "./assets/Model_with_logo/1000ml_round_with_logo.glb",
     },
   ],
   "Round Square": [
     {
       name: "450ml/500gms Container",
-      path: "./assets/Model_with_logo/450ml round_square with logo.glb",
+      path: "./assets/Model_with_logo/450ml_round_square_with_logo.glb",
     },
     {
       name: "500ml Container",
-      path: "./assets/Model_with_logo/500ml round_square with logo.glb",
+      path: "./assets/Model_with_logo/500ml_round_square_with_logo.glb",
     },
   ],
   Rectangle: [
     {
       name: "500ml Rectangular Container",
-      path: "./assets/Model_with_logo/500ml Rectangle with logo.glb",
+      path: "./assets/Model_with_logo/500ml_rectangle_with_logo.glb",
     },
     {
       name: "650ml Rectangular Container",
-      path: "./assets/Model_with_logo/650ml Rectangle with logo.glb",
+      path: "./assets/Model_with_logo/650ml_rectangle_with_logo.glb",
     },
     {
       name: "750ml Rectangular Container",
-      path: "./assets/Model_with_logo/750ml Rectangle with logo.glb",
+      path: "./assets/Model_with_logo/750ml_rectangle_with_logo.glb",
     },
   ],
   "Sweet Box": [
     {
       name: "250gms Sweet Box",
-      path: "./assets/Model_with_logo/250gms Sweet_box with logo.glb",
+      path: "./assets/Model_with_logo/250gms_sweet_box_with_logo.glb",
     },
     {
       name: "500gms Sweet Box",
-      path: "./assets/Model_with_logo/500gms Sweet_box with logo.glb",
+      path: "./assets/Model_with_logo/500gms_sweet_box_with_logo.glb",
     },
     {
       name: "1kg Sweet Box",
-      path: "./assets/Model_with_logo/1kg Sweet_box with logo.glb",
+      path: "./assets/Model_with_logo/1kg_sweet_box_with_logo.glb",
     },
   ],
   "Sweet Box Tamper Evident": [
     {
       name: "250gms Sweet Box Tamper Evident",
-      path: "./assets/Model_with_logo/250gms Sweet_box_TE with logo.glb",
+      path: "./assets/Model_with_logo/250gms_sweet_box_TE_with_logo.glb",
     },
     {
       name: "500gms Sweet Box Tamper Evident",
-      path: "./assets/Model_with_logo/500gms Sweet_box_TE with logo.glb",
+      path: "./assets/Model_with_logo/500gms_sweet_box_TE_with_logo.glb",
     },
   ],
 };
