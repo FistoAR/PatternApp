@@ -268,11 +268,11 @@ const MODEL_CATEGORIES = {
     },
     {
       name: "750ml Round Container",
-      path: "./assets/Model_with_logo/750ml round with logo.glb",
+      path: "./assets/Model_with_logo/750ml Round with logo.glb",
     },
     {
       name: "1000ml Round Container",
-      path: "./assets/Model_with_logo/1000ml round with logo.glb",
+      path: "./assets/Model_with_logo/1000ml Round with logo.glb",
     },
   ],
   "Round Square": [
