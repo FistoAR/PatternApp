@@ -153,14 +153,14 @@
               <!-- Left: Auto Apply Pattern & Hide Logo -->
               <div style="position: absolute; left: 1.5vw; display: flex; align-items: center; gap: 1vw;">
                 <div style="display: flex; align-items: center; gap: 0.5vw;">
-                  <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Apply Pattern</span>
+                  <span class="model-control-span">Auto Apply Pattern</span>
                   <label class="rotate-switch">
                     <input type="checkbox" id="autoApplyToggle" checked>
                     <span class="rotate-slider"></span>
                   </label>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.5vw;">
-                  <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Hide Logo</span>
+                  <span class="model-control-span">Hide Logo</span>
                   <label class="rotate-switch">
                     <input type="checkbox" id="hideLogoToggle">
                     <span class="rotate-slider"></span>
@@ -169,11 +169,11 @@
               </div>
 
               <!-- Center: Model Name -->
-              <h3 id="mainModelTitle" style="margin: 0; font-size: 15px;">120ml Round Container</h3>
+              <h3 id="mainModelTitle">120ml Round Container</h3>
 
               <!-- Right: Auto Rotate -->
               <div style="position: absolute; right: 1.5vw; display: flex; align-items: center; gap: 0.5vw;">
-                <span style="font-size: 0.85vw; font-weight: 500; color: #333;">Auto Rotate</span>
+                <span class="model-control-span">Auto Rotate</span>
                 <label class="rotate-switch">
                   <input type="checkbox" id="autoRotateToggle" checked>
                   <span class="rotate-slider"></span>
@@ -181,6 +181,10 @@
               </div>
             </div>
             <div class="model_view">
+              <div id="modelLoader" class="model-loader-overlay">
+                <div class="spinner"></div>
+                <p>Loading Model...</p>
+              </div>
               <model-viewer
                 id="mainViewer"
                 src="./assets/Model_with_logo/120ml round with logo.glb"
@@ -196,6 +200,9 @@
                 ar
                 interaction-prompt="none"
                 min-field-of-view="5deg"
+                loading="eager"
+                touch-action="none"
+                interpolation-decay="200"
                 max-field-of-view="65deg"
               >
                 <div class="viewer-controls glass-group">

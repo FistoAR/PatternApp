@@ -35,6 +35,7 @@
   align-items: center;
   margin: auto;
   /* border-bottom: 2px solid black; */
+  position: relative; /* Core for absolute overlay */
 }
 
 #mainViewer{
@@ -57,6 +58,32 @@
   justify-content: space-between;
   padding: 0 1.5vw;
   background-color: white;
+}
+
+/* Contrast Control Spans & Headers */
+.model-control-span {
+  font-size: 0.85vw;
+  font-weight: 500;
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+#mainModelTitle {
+  margin: 0;
+  font-size: 0.9vw;
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+/* Dark Mode Overrides */
+#modelcontainer.bg-dark .model-control-span,
+#modelcontainer.bg-dark #mainModelTitle,
+#modelcontainer.bg-dark .model-loader-overlay p {
+  color: #ffffff !important;
+}
+
+#modelcontainer.bg-dark {
+  border-color: #444; /* Darker border when bg is dark */
 }
 
 .footer-section {
@@ -303,3 +330,51 @@
   pointer-events: none;
 }
 
+
+/* Model Loader Overlay for smooth switching */
+.model-loader-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgb(199, 199, 199);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 200; /* Above viewer controls */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease; /* Keep transition for fade-out */
+}
+
+.model-loader-overlay.active {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transition: none !important; /* Instant appear */
+}
+
+.model-loader-overlay .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #fbd238;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+.model-loader-overlay p {
+  font-size: 0.9vw;
+  font-weight: 500;
+  color: #555;
+  transition: color 0.3s ease;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

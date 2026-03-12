@@ -109,10 +109,16 @@ const PART_MATERIALS = {
 };
 
 /********** UPDATE MATERIAL COLOR **********/
-function updateMaterialColor(part, color, { skipWait = false } = {}) {
-  const viewers = Array.from(
-    new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
-  );
+function updateMaterialColor(
+  part,
+  color,
+  { skipWait = false, specificViewer = null } = {},
+) {
+  const viewers = specificViewer
+    ? [specificViewer]
+    : Array.from(
+        new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)),
+      );
 
   const factors = {
     white: [1, 1, 1, 1],
@@ -565,7 +571,10 @@ function filterPatternAccordion(shapeFilter, keepCycleIndex = false) {
         if (sw.style.display !== "none") typeVisible = true;
       });
       header.style.display = typeVisible ? "block" : "none";
-      if (header.parentElement && header.parentElement.classList.contains("pattern-group")) {
+      if (
+        header.parentElement &&
+        header.parentElement.classList.contains("pattern-group")
+      ) {
         header.parentElement.style.display = typeVisible ? "flex" : "none";
       }
     });
@@ -635,29 +644,35 @@ function filterPatternAccordion(shapeFilter, keepCycleIndex = false) {
   });
 
   state.allPatterns = [...new Set(pool)];
-
-  // If auto-apply is on, restart the cycle with new pool
-  const autoApplyToggle = document.getElementById("autoApplyToggle");
-  if (autoApplyToggle && autoApplyToggle.checked) {
-    startPatternCycle(state.allPatterns, 2000, keepCycleIndex);
-  }
 }
 
 /********** MODEL SELECTION **********/
 async function selectModel(index) {
   if (index < 0 || index >= state.thumbnails.length) return;
 
+  const modelLoader = document.getElementById("modelLoader");
+  if (modelLoader) {
+    modelLoader.classList.add("active");
+  }
+
+  // 🛑 STOP CYCLE: Prevent auto-pattern from firing during model load/transition
+  stopPatternCycle(false);
+
   // 🔄 REVERT CANVAS EDITS: If switching models, clear edited pattern and restore brand logo
   if (state.isEdited) {
     const confirmed = await showConfirmModal(
       "Your edited pattern will be lost. Are you sure you want to switch models?",
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+      if (modelLoader) modelLoader.classList.remove("active");
+      return;
+    }
 
     console.log(
       "[CategorySwitch] Reverting edited pattern to last library pattern.",
     );
-    state.patternUrl = null; // Clear pattern
+    state.patternUrl = state.lastLibraryPatternUrl; // Restore last non-edited pattern
+    state.patternUrlTop = state.lastLibraryPatternUrlTop;
     state.logoDataUrl = null; // Clear uploaded logo
     state.isEdited = false;
     state.hideLogo = false;
@@ -692,18 +707,14 @@ async function selectModel(index) {
   const selectedModel = state.thumbnails[index];
   if (!mainViewer) return;
 
-  const modelPath = encodeURI(selectedModel.path);
-  // Force reload if we just reverted an edit (to ensure clean reload even on same model)
-  if (mainViewer.src === modelPath) {
-    mainViewer.src =
-      modelPath + (modelPath.includes("?") ? "&" : "?") + "t=" + Date.now();
-  } else {
-    mainViewer.src = modelPath;
-  }
+  const transitionStart = Date.now();
+
+  // Set reveal="auto" (we use our own overlay for the transition)
+  mainViewer.reveal = "auto";
   mainViewer.alt = selectedModel.name;
   mainModelTitle.textContent = selectedModel.name;
 
-  // Only STOP pattern cycle if we switch to a completely different shape type
+  // 🔎 PRE-CALCULATE SHAPE INFO (needed for load listener and accordion filtering)
   const lowerCat = selectedModel.shape.toLowerCase().trim();
   let shapeFilter = selectedModel.shape; // default from category
   if (lowerCat === "round") shapeFilter = "Round";
@@ -723,16 +734,18 @@ async function selectModel(index) {
     stopPatternCycle(false);
     state.autoPatternIdx = 0;
 
-    // Reset pattern to 1st compatible if Auto Apply is OFF
-    const autoApplyToggle = document.getElementById("autoApplyToggle");
-    if (!autoApplyToggle || !autoApplyToggle.checked) {
-      state.patternUrl = null;
-    }
+    // Reset pattern URLs to NULL whenever we change model type (Round -> Rectangle etc.)
+    // This allows the "load" event listener below to identify the NEW first compatible 
+    // pattern for the fresh shape, avoiding any flicker from the previous model's pattern.
+    state.patternUrl = null;
+    state.patternUrlTop = null;
   } else {
     console.log("[CategorySwitch] Same type, continuing pattern sequence.");
   }
 
   filterPatternAccordion(shapeFilter, !typeChanged);
+
+  const modelPath = encodeURI(selectedModel.path);
 
   mainViewer.addEventListener(
     "load",
@@ -754,12 +767,14 @@ async function selectModel(index) {
             state.selectedColors.tub = "white";
           }
 
-          // Apply to the 3D model
+          // Apply to the 3D model (Main Viewer only to avoid lag)
           updateMaterialColor("lid", state.selectedColors.lid, {
             skipWait: true,
+            specificViewer: mainViewer,
           });
           updateMaterialColor("tub", state.selectedColors.tub, {
             skipWait: true,
+            specificViewer: mainViewer,
           });
         }
 
@@ -779,14 +794,7 @@ async function selectModel(index) {
         mainViewer.setAttribute("max-camera-orbit", "auto auto 0.95m");
         mainViewer.setAttribute("min-camera-orbit", "auto auto 0.25m");
 
-        console.log("Model fully available:", selectedModel.name);
-
-        // 🧹 RESET ALL MATERIALS on the new model first
-        ["lid_label", "tub_label"].forEach((matName) => {
-          clearMaterialTexture(mainViewer, matName);
-        });
-
-        // Material detection - prefer shape-based check
+        // Material detection
         const curShape = getCanonicalShape(selectedModel.shape);
         const isRect =
           isRectangleModel(selectedModel.name) || curShape === "Rectangle";
@@ -796,10 +804,7 @@ async function selectModel(index) {
 
         state.patternMaterialOverride = materialName;
 
-        // Only apply if user hasn't switched to another model (redundant check for safety)
-        if (state.selectedIndex !== capturedIndex) return;
-
-        // Apply first pattern if auto-apply is OFF and shape changed
+        // Resolve pattern logic
         if (!state.patternUrl) {
           let firstCompatible = null;
           for (const cat of state.categories) {
@@ -834,14 +839,40 @@ async function selectModel(index) {
           }
         }
 
+        // 🚀 PERFORM ALL UPDATES IN PARALLEL for maximum speed
+        const updateTasks = [];
         if (state.patternUrl) {
-          await applyPatternToAll(state.patternUrl, {
-            materialOverride: materialName,
-            patternUrlTop: state.patternUrlTop,
-            isEdited: state.isEdited,
-          });
+          updateTasks.push(
+            applyPatternToAll(state.patternUrl, {
+              materialOverride: materialName,
+              patternUrlTop: state.patternUrlTop,
+              isEdited: state.isEdited,
+            }),
+          );
+        }
+        if (state.logoDataUrl) {
+          updateTasks.push(
+            tryApplyMaterialTexture(
+              mainViewer,
+              LOGO_MATERIAL_NAME,
+              state.logoDataUrl,
+            ),
+          );
+        }
+        for (const [part, color] of Object.entries(state.selectedColors)) {
+          updateTasks.push(
+            updateMaterialColor(part, color, {
+              skipWait: true,
+              specificViewer: mainViewer,
+            }),
+          );
+        }
 
-          // Update swatch selection
+        // Wait for ALL visual updates
+        await Promise.all(updateTasks);
+
+        // Update swatch UI
+        if (state.patternUrl) {
           document.querySelectorAll(".pattern-swatch").forEach((el) => {
             el.classList.toggle(
               "selected",
@@ -850,28 +881,36 @@ async function selectModel(index) {
           });
         }
 
-        if (state.logoDataUrl) {
-          console.log(
-            "Available materials on mainViewer:",
-            mainViewer.model?.materials?.map((m) => m.name),
-          );
+        // ✅ CONSISTENT 1S LOADING: Calculate remaining time to wait
+        const elapsed = Date.now() - transitionStart;
+        const remaining = Math.max(120, 1000 - elapsed); // Minimum 120ms for render frame, or up to 1s total
 
-          await Promise.all(
-            viewers.map((v) =>
-              tryApplyMaterialTexture(v, LOGO_MATERIAL_NAME, state.logoDataUrl),
-            ),
-          );
-        }
+        setTimeout(() => {
+          if (modelLoader) modelLoader.classList.remove("active");
+        }, remaining);
 
-        for (const [part, color] of Object.entries(state.selectedColors)) {
-          updateMaterialColor(part, color, { skipWait: true });
+        console.log("Model ready:", selectedModel.name);
+
+        // ✅ RESUME CYCLE: Only restart the auto-cycle after everything is applied and model is ready
+        const autoApplyToggle = document.getElementById("autoApplyToggle");
+        if (autoApplyToggle && autoApplyToggle.checked && state.allPatterns.length > 0) {
+          startPatternCycle(state.allPatterns, 2000, true);
         }
       } catch (err) {
-        console.error("Error applying pattern or logo on model load:", err);
+        console.error("Error applying pattern or logo:", err);
+        if (modelLoader) modelLoader.classList.remove("active");
       }
     },
     { once: true },
   );
+
+  // Force reload if we just reverted an edit
+  if (mainViewer.src === modelPath) {
+    mainViewer.src =
+      modelPath + (modelPath.includes("?") ? "&" : "?") + "t=" + Date.now();
+  } else {
+    mainViewer.src = modelPath;
+  }
 }
 
 /********** FETCH CATEGORIES & PATTERNS **********/
@@ -954,7 +993,8 @@ async function initCategoryAccordion() {
     // Build swatches grouped by type
     if (catPatterns.length) {
       const noteMsg = document.createElement("div");
-      noteMsg.textContent = "Stop auto apply pattern to double click to view pattern";
+      noteMsg.textContent =
+        "Stop auto apply pattern to double click to view pattern";
       noteMsg.style.fontSize = "0.7vw";
       noteMsg.style.color = "#888";
       noteMsg.style.fontStyle = "italic";
@@ -1036,24 +1076,28 @@ async function initCategoryAccordion() {
               state.lastLogoState = null;
               state.hideLogo = false;
               state.isWithoutLogoModel = false;
-              
+
               const logoInp = document.getElementById("logoUpload");
               if (logoInp) logoInp.value = "";
-              
+
               const hideLogoToggle = document.getElementById("hideLogoToggle");
               if (hideLogoToggle) hideLogoToggle.checked = false;
-              
+
               // Re-enable visibility (if it was just hidden)
               toggleLogoVisibility(false);
-              
+
               // If a custom 3D material logo was applied, clearing requires model reload to get baked-in texture back
               // But we can just clear it visually or reload it. The easiest is calling clearMaterialTexture to wipe the override.
-              // But wait, clearMaterialTexture removes the baked-in one too. 
-              // We'll just leave it un-overridden for now, or reload if necessary. 
+              // But wait, clearMaterialTexture removes the baked-in one too.
+              // We'll just leave it un-overridden for now, or reload if necessary.
               // Actually, since we're applying a new pattern and the user explicitly asked to clear the logo:
-              const allViewers = Array.from(new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)));
-              allViewers.forEach(v => {
-                if(v && v.src && v.src.includes("?t=")) {
+              const allViewers = Array.from(
+                new Set(
+                  [...(state.modelViewers || []), mainViewer].filter(Boolean),
+                ),
+              );
+              allViewers.forEach((v) => {
+                if (v && v.src && v.src.includes("?t=")) {
                   v.src = v.src.split("?")[0] + "?t=" + Date.now();
                 }
               });
@@ -1095,9 +1139,13 @@ async function initCategoryAccordion() {
             sw.dataset.patternType = patObj.type;
 
             sw.addEventListener("dblclick", () => {
-              const autoApplyToggle = document.getElementById("autoApplyToggle");
+              const autoApplyToggle =
+                document.getElementById("autoApplyToggle");
               if (autoApplyToggle && autoApplyToggle.checked) return;
-              openPatternFullView(patObj.type === "bottom" ? url : null, patObj.type === "top" ? url : null);
+              openPatternFullView(
+                patObj.type === "bottom" ? url : null,
+                patObj.type === "top" ? url : null,
+              );
             });
 
             sw.addEventListener("click", async () => {
@@ -1122,18 +1170,23 @@ async function initCategoryAccordion() {
                 state.lastLogoState = null;
                 state.hideLogo = false;
                 state.isWithoutLogoModel = false;
-                
+
                 const logoInp = document.getElementById("logoUpload");
                 if (logoInp) logoInp.value = "";
-                
-                const hideLogoToggle = document.getElementById("hideLogoToggle");
+
+                const hideLogoToggle =
+                  document.getElementById("hideLogoToggle");
                 if (hideLogoToggle) hideLogoToggle.checked = false;
-                
+
                 toggleLogoVisibility(false);
-                
-                const allViewers = Array.from(new Set([...(state.modelViewers || []), mainViewer].filter(Boolean)));
-                allViewers.forEach(v => {
-                  if(v && v.src && v.src.includes("?t=")) {
+
+                const allViewers = Array.from(
+                  new Set(
+                    [...(state.modelViewers || []), mainViewer].filter(Boolean),
+                  ),
+                );
+                allViewers.forEach((v) => {
+                  if (v && v.src && v.src.includes("?t=")) {
                     v.src = v.src.split("?")[0] + "?t=" + Date.now();
                   }
                 });
@@ -1694,6 +1747,21 @@ async function applyPatternToAll(
 ) {
   if (!patternUrl) return;
 
+  // 🛡️ SHIELD: Show loader for Sweet Box multi-pattern application to hide the sequential apply
+  const modelLoader = document.getElementById("modelLoader");
+  const modelName = mainViewer ? mainViewer.alt : "";
+  const canonical = getCanonicalShape(modelName);
+  const isSweetBox = canonical.toLowerCase().includes("sweet box");
+  const loaderWasActive = modelLoader
+    ? modelLoader.classList.contains("active")
+    : false;
+  const needsLoader =
+    isSweetBox && patternUrlTop && modelLoader && !loaderWasActive;
+
+  if (needsLoader) {
+    modelLoader.classList.add("active");
+  }
+
   const cleanSelectedUrl = patternUrl.split("?")[0];
   state.patternUrl = cleanSelectedUrl;
   state.lastLibraryPatternUrl = isEdited
@@ -1766,29 +1834,44 @@ async function applyPatternToAll(
       modelAlt.includes("tamper evident") ||
       modelAlt.includes("sweet box te");
 
-    let targets = [];
-    if (isBox) {
-      if (state.currentPatternType === "top")
-        targets = RECTANGLE_PATTERN_MATERIAL_NAME;
-      else if (state.currentPatternType === "bottom")
-        targets = PATTERN_MATERIAL_NAME;
-      else
-        targets = [
-          ...RECTANGLE_PATTERN_MATERIAL_NAME,
-          ...PATTERN_MATERIAL_NAME,
-        ];
+    let tasks = [];
+    if (patternUrlTop) {
+      tasks = [
+        { url: patternUrl, type: "bottom" },
+        { url: patternUrlTop, type: "top" },
+      ];
     } else {
-      targets = isRectangleModel(modelAlt)
-        ? RECTANGLE_PATTERN_MATERIAL_NAME
-        : PATTERN_MATERIAL_NAME;
+      tasks = [{ url: patternUrl, type: state.currentPatternType || "bottom" }];
     }
 
-    const applyOne = async (pUrl, pType) => {
-      if (!pUrl) return;
+    // 🚀 STEP 1: LOAD ALL TEXTURES IN PARALLEL
+    // We pre-create the textures and put them in cache so they are ready for instant application
+    await Promise.all(
+      tasks.map(async (task) => {
+        if (!task.url) return;
+        let vcache = viewerTextureCache.get(viewer);
+        if (!vcache) {
+          vcache = new Map();
+          viewerTextureCache.set(viewer, vcache);
+        }
+        const cacheKey = `${stripQuery(task.url)}_rot0`;
+        if (!forceReload && vcache.has(cacheKey)) return;
+
+        try {
+          const tex = await viewer.createTexture(task.url);
+          vcache.set(cacheKey, tex);
+        } catch (e) {
+          console.error("[applyTask] Failed to preload texture:", task.url, e);
+        }
+      }),
+    );
+
+    // 🚀 STEP 2: APPLY ALL TEXTURES (Now synchronous from cache)
+    for (const task of tasks) {
       let matNames = [];
       if (isBox) {
         matNames =
-          pType === "top"
+          task.type === "top"
             ? RECTANGLE_PATTERN_MATERIAL_NAME
             : PATTERN_MATERIAL_NAME;
       } else {
@@ -1796,20 +1879,13 @@ async function applyPatternToAll(
           ? RECTANGLE_PATTERN_MATERIAL_NAME
           : PATTERN_MATERIAL_NAME;
       }
-      let rot = 0;
-      await tryApplyMaterialTexture(viewer, matNames, pUrl, {
-        skipWait: true,
-        rotation: rot,
-      });
-    };
 
-    if (patternUrlTop) {
-      await Promise.all([
-        applyOne(patternUrl, "bottom"),
-        applyOne(patternUrlTop, "top"),
-      ]);
-    } else {
-      await applyOne(patternUrl, state.currentPatternType || "bottom");
+      // This call will now find the texture in cache and apply it instantly without awaiting
+      await tryApplyMaterialTexture(viewer, matNames, task.url, {
+        skipWait: true,
+        rotation: 0,
+        forceReload,
+      });
     }
   };
 
@@ -1820,6 +1896,13 @@ async function applyPatternToAll(
   allViewers
     .filter((v) => v !== mainViewer)
     .forEach((v) => applyTask(v).catch(() => {}));
+
+  // Hide shield after apply is done
+  if (needsLoader) {
+    setTimeout(() => {
+      modelLoader.classList.remove("active");
+    }, 1000);
+  }
 }
 
 /********** CREATE LOGO CANVAS WITHOUT STRETCH **********/
@@ -2000,18 +2083,52 @@ const modalContent = document.querySelector(".modal-content");
 const pickrContainer = document.getElementById("bgColorPicker");
 const trigger = document.getElementById("bgColorPickerTrigger");
 
-// Brightness calculation (used for border contrast)
-function getBrightness(hex) {
-  const r = parseInt(hex.substr(1, 2), 16);
-  const g = parseInt(hex.substr(3, 2), 16);
-  const b = parseInt(hex.substr(5, 2), 16);
+// Brightness calculation (handles hex, rgba, and color names)
+function getBrightness(color) {
+  if (!color || typeof color !== "string") return 255; // Default to light
+
+  let r, g, b;
+  if (color.startsWith("#")) {
+    r = parseInt(color.substr(1, 2), 16) || 0;
+    g = parseInt(color.substr(3, 2), 16) || 0;
+    b = parseInt(color.substr(5, 2), 16) || 0;
+  } else if (color.startsWith("rgb")) {
+    const match = color.match(/\d+/g);
+    if (match) {
+      [r, g, b] = match.map(Number);
+    }
+  } else {
+    // Fallback for "white", "black" etc
+    const lower = color.toLowerCase();
+    if (lower === "white") return 255;
+    if (lower === "black") return 0;
+    return 200; // default light-ish
+  }
   return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
 // Apply chosen color
-function applyColor(colorStr) {
+function applyColor(colorStr, hexColor = null, opaqueColor = null) {
   mainbg.style.backgroundColor = colorStr;
   modalContent.style.backgroundColor = colorStr;
+
+  // Also update the loader overlay to match exactly - FORCE OPAQUE
+  // User asked for no transparency on loader to hide glitches
+  const modelLoader = document.getElementById("modelLoader");
+  if (modelLoader) {
+    modelLoader.style.backgroundColor = opaqueColor || hexColor || colorStr;
+  }
+
+  // Handle text contrast based on brightness
+  const colorToMeasure = hexColor || colorStr;
+  const brightness = getBrightness(colorToMeasure);
+
+  if (brightness < 128) {
+    mainbg.classList.add("bg-dark");
+  } else {
+    mainbg.classList.remove("bg-dark");
+  }
+
   localStorage.setItem("bgColor", colorStr);
 }
 
@@ -2046,7 +2163,12 @@ const pickr = Pickr.create({
 // Restore saved color on init
 pickr.on("init", () => {
   const savedColor = localStorage.getItem("bgColor") || "#c7c7c7ff";
-  applyColor(savedColor);
+  // On init, extract hex if possible for the opaque base
+  const opaqueBase =
+    savedColor && savedColor.startsWith("#")
+      ? savedColor.substring(0, 7)
+      : savedColor;
+  applyColor(savedColor, savedColor, opaqueBase);
   pickr.setColor(savedColor);
   updatePickrBorderColor(savedColor);
 });
@@ -2055,8 +2177,10 @@ pickr.on("init", () => {
 pickr.on("change", (color) => {
   const rgbaColor = color.toRGBA().toString();
   const hexColor = color.toHEXA().toString();
+  // Get 6-digit hex for the opaque base by slicing the 8-digit HEXA string
+  const opaqueColor = hexColor.slice(0, 7);
 
-  applyColor(rgbaColor);
+  applyColor(rgbaColor, hexColor, opaqueColor);
   updatePickrBorderColor(hexColor);
 });
 
@@ -2105,11 +2229,56 @@ partTrigger.addEventListener("click", () => {
   partPickr.show();
 });
 
-function preloadImages(urls = []) {
-  urls.forEach((url) => {
-    const img = new Image();
-    img.src = url + "?preload=" + Date.now(); // force preload with unique param
-  });
+async function preloadImages(urls = []) {
+  if (!urls || urls.length === 0) return;
+  const viewer = mainViewer || document.getElementById("mainViewer");
+  if (!viewer) {
+    console.warn("[Preload] No viewer found, falling back to basic image preload.");
+    urls.forEach((url) => { if(url) (new Image()).src = url; });
+    return;
+  }
+
+  console.log(`[Preload] Priming 3D texture cache for ${urls.length} images...`);
+  
+  // Create textures in small batches to keep the GPU and UI thread responsive
+  const batchSize = 3;
+  let current = 0;
+
+  const loadBatch = async () => {
+    const batch = urls.slice(current, current + batchSize);
+    
+    await Promise.all(batch.map(async (url) => {
+      if (!url) return;
+      
+      let vcache = viewerTextureCache.get(viewer);
+      if (!vcache) {
+        vcache = new Map();
+        viewerTextureCache.set(viewer, vcache);
+      }
+      
+      const cacheKey = `${stripQuery(url)}_rot0`;
+      // If already in cache (either from previous preload or manual use), skip
+      if (vcache.has(cacheKey)) return;
+
+      try {
+        // This is the heavy lifting: pre-creating the WebGL texture
+        const tex = await viewer.createTexture(url);
+        vcache.set(cacheKey, tex);
+      } catch (e) {
+        // Silent fail for background preloading
+      }
+    }));
+    
+    current += batchSize;
+    if (current < urls.length) {
+      // Slight delay between batches to allow for render frames
+      setTimeout(loadBatch, 400); 
+    } else {
+      console.log("[Preload] 3D cache priming complete.");
+    }
+  };
+
+  loadBatch();
 }
 
 // JavaScript
@@ -2573,8 +2742,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ✅ Wait for thumbnails and categories to load
+  state.allPatterns = await initCategoryAccordion();
   await initModelAccordion();
-  state.allPatterns = await initCategoryAccordion(); // must return all patterns!
 
   // ✅ Apply default filter for "Round" since it's opened by default
   filterPatternAccordion("Round");
@@ -2686,10 +2855,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateMaterialColor(part, savedColor);
   });
 
-  // ✅ Preload and cycle patterns (after loading categories)
-  if (state.allPatterns && state.allPatterns.length > 0) {
-    preloadImages(state.allPatterns);
-    if (autoApplyToggle && autoApplyToggle.checked) {
+  // ✅ Preload ALL patterns (across all models/shapes) for instant switching
+  if (state.rawPatterns && state.rawPatterns.length > 0) {
+    const allUrls = [];
+    state.rawPatterns.forEach((p) => {
+      if (p.pattern_url) allUrls.push(resolvePatternUrl(p.pattern_url));
+      if (p.pattern_url_top) allUrls.push(resolvePatternUrl(p.pattern_url_top));
+    });
+    const uniqueUrls = [...new Set(allUrls)];
+    preloadImages(uniqueUrls);
+
+    if (autoApplyToggle && autoApplyToggle.checked && state.allPatterns.length > 0) {
       startPatternCycle(state.allPatterns, 2000);
     }
   }
@@ -2811,12 +2987,12 @@ function openPatternFullView(bottomUrl, topUrl) {
   } else if (bottomUrl) {
     fullViewImages = [bottomUrl];
   }
-  
+
   if (fullViewImages.length === 0) return;
-  
+
   fullViewCurrentIndex = 0;
   updateFullViewModal();
-  
+
   const modal = document.getElementById("fullViewModal");
   if (modal) {
     modal.classList.add("show");
@@ -2827,17 +3003,19 @@ function openPatternFullView(bottomUrl, topUrl) {
 function updateFullViewModal() {
   const img = document.getElementById("fullViewImage");
   const nextBtn = document.getElementById("fullViewNextBtn");
-  
+
   if (img) {
     img.src = fullViewImages[fullViewCurrentIndex];
   }
-  
+
   if (nextBtn) {
     if (fullViewImages.length > 1) {
       nextBtn.style.display = "block";
-      nextBtn.textContent = fullViewCurrentIndex === 0 ? "Show Tub Image" : "Show Lid Image";
+      nextBtn.textContent =
+        fullViewCurrentIndex === 0 ? "Show Tub Image" : "Show Lid Image";
       nextBtn.onclick = () => {
-        fullViewCurrentIndex = (fullViewCurrentIndex + 1) % fullViewImages.length;
+        fullViewCurrentIndex =
+          (fullViewCurrentIndex + 1) % fullViewImages.length;
         updateFullViewModal();
       };
     } else {
