@@ -668,7 +668,7 @@ window.addEventListener("DOMContentLoaded", () => {
       cardModelViewer.src = modelSrcForCard || modelSrc;
       cardModelViewer.setAttribute("camera-controls", "");
       cardModelViewer.setAttribute("exposure", "1");
-      cardModelViewer.setAttribute("shadow-intensity", "0.5");
+      cardModelViewer.setAttribute("shadow-intensity", "1");
       cardModelViewer.setAttribute("disable-tap", "");
       cardModelViewer.setAttribute("disable-pan", "");
       cardModelViewer.setAttribute("interaction-prompt", "none");
@@ -962,16 +962,19 @@ window.addEventListener("DOMContentLoaded", () => {
             bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(
               originalBottomTexture || null,
             );
-            bottomMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
           }
           const topMat = modelViewer.model.materials.find((m) =>
             LidColorMaterials.includes(m.name),
           );
           if (topMat) {
             topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
-            topMat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
           }
+          
+          updatePartTransparency(modelViewer, "tub", false, null);
+          updatePartTransparency(modelViewer, "lid", false, null);
         }
+        
+        syncViewerState(modelViewer);
       };
 
       if (isDualMode && lidFile) {
@@ -1922,7 +1925,7 @@ window.addEventListener("DOMContentLoaded", () => {
     mainModelViewer.setAttribute("max-field-of-view", "45deg");
     mainModelViewer.setAttribute("field-of-view", fov);
 
-    mainModelViewer.setAttribute("shadow-intensity", "0");
+    mainModelViewer.setAttribute("shadow-intensity", "1");
     mainModelViewer.setAttribute("exposure", "1");
     mainModelViewer.setAttribute("environment-image", "neutral");
 
@@ -2079,7 +2082,7 @@ window.addEventListener("DOMContentLoaded", () => {
     pdfModelViewer.setAttribute("disable-tap", "");
     pdfModelViewer.setAttribute("disable-pan", "");
     pdfModelViewer.setAttribute("interaction-prompt", "none");
-    pdfModelViewer.setAttribute("shadow-intensity", "0.5");
+    pdfModelViewer.setAttribute("shadow-intensity", "1");
     pdfModelViewer.style.width = `${customWidth}px`;
     pdfModelViewer.style.height = `${customHeight}px`;
     pdfModelViewer.style.position = "fixed";
@@ -2260,14 +2263,6 @@ window.addEventListener("DOMContentLoaded", () => {
       // --- Cover Page ---
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
-
-      const bgImage = new Image();
-      bgImage.src = "./assets/pattern/pattern-6.webp";
-      await new Promise((res) => {
-        bgImage.onload = res;
-      });
-
-      pdf.addImage(bgImage, "PNG", 0, 0, pageWidth, pageHeight);
 
       const terraLogo1 = new Image();
       terraLogo1.src = "./assets/Logo/terratechpacks.png";
