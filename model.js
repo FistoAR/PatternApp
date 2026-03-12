@@ -323,10 +323,16 @@ const MODEL_CATEGORIES = {
     {
       name: "250gms Sweet Box Tamper Evident",
       path: "./assets/Model_with_logo/250gms_sweet_box_TE_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.45m",
+      minCameraOrbit: "auto auto 0.45m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "500gms Sweet Box Tamper Evident",
       path: "./assets/Model_with_logo/500gms_sweet_box_TE_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.45m",
+      minCameraOrbit: "auto auto 0.45m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
   ],
 };
@@ -441,9 +447,8 @@ async function initModelAccordion() {
       content.appendChild(card);
 
       state.thumbnails.push({
+        ...model,
         card,
-        name: model.name,
-        path: model.path,
         shape: category,
       });
       state.modelViewers.push(mv);
@@ -743,6 +748,18 @@ async function selectModel(index) {
     console.log("[CategorySwitch] Same type, continuing pattern sequence.");
   }
 
+  // ✅ Apply Per-Model View Settings BEFORE loading source
+  if (selectedModel) {
+    let minOrbit = selectedModel.minCameraOrbit || "auto auto 0.25m";
+    let maxOrbit = selectedModel.maxCameraOrbit || "auto auto 0.95m";
+    let orbit = selectedModel.cameraOrbit || "0deg 75deg auto";
+    
+    mainViewer.setAttribute("min-camera-orbit", minOrbit);
+    mainViewer.setAttribute("max-camera-orbit", maxOrbit);
+    mainViewer.setAttribute("camera-orbit", orbit);
+    mainViewer.cameraOrbit = orbit;
+  }
+
   filterPatternAccordion(shapeFilter, !typeChanged);
 
   const modelPath = encodeURI(selectedModel.path);
@@ -790,9 +807,17 @@ async function selectModel(index) {
         // Apply logo visibility
         toggleLogoVisibility(state.hideLogo);
 
-        // Ensure zoom out is allowed (override any restrictive defaults)
-        mainViewer.setAttribute("max-camera-orbit", "auto auto 0.95m");
-        mainViewer.setAttribute("min-camera-orbit", "auto auto 0.25m");
+        // ✅ RE-APPLY per-model camera settings AFTER load to ensure they stick
+        if (selectedModel) {
+          const minO = selectedModel.minCameraOrbit || "auto auto 0.25m";
+          const maxO = selectedModel.maxCameraOrbit || "auto auto 0.95m";
+          const orb = selectedModel.cameraOrbit || "0deg 75deg auto";
+          
+          mainViewer.setAttribute("min-camera-orbit", minO);
+          mainViewer.setAttribute("max-camera-orbit", maxO);
+          mainViewer.setAttribute("camera-orbit", orb);
+          mainViewer.cameraOrbit = orb;
+        }
 
         // Material detection
         const curShape = getCanonicalShape(selectedModel.shape);
@@ -2811,7 +2836,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetViewBtn.addEventListener("click", () => {
       const viewer = getViewer();
       if (!viewer) return;
-      viewer.cameraOrbit = "0deg 75deg auto";
+
+      const thumb = state.thumbnails[state.selectedIndex];
+      if (thumb && thumb.cameraOrbit) {
+        viewer.cameraOrbit = thumb.cameraOrbit;
+      } else {
+        viewer.cameraOrbit = "0deg 75deg auto";
+      }
       viewer.fieldOfView = "auto";
     });
   }
