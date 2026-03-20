@@ -312,9 +312,7 @@
   max-width: 100%;
   max-height: 80vh;
   object-fit: contain;
-  border-radius: 1vw;
-  box-shadow: 0 2vw 5vw rgba(0,0,0,0.5);
-  background: white;
+  border-radius: 0.6vw;
 }
 
 .lightbox-label {

@@ -3021,8 +3021,49 @@ function openPatternFullView(bottomUrl, topUrl) {
 
   if (fullViewImages.length === 0) return;
 
-  fullViewCurrentIndex = 0;
-  updateFullViewModal();
+  const selectedModel = state.thumbnails[state.selectedIndex];
+  const isSweetBox =
+    selectedModel && selectedModel.shape === "Sweet Box";
+  const isSweetBoxTE =
+    selectedModel &&
+    selectedModel.shape === "Sweet Box Tamper Evident";
+
+  const singleContainer = document.getElementById("fullViewSingle");
+  const dualContainer = document.getElementById("fullViewDual");
+  const verticalContainer = document.getElementById("fullViewVertical");
+
+  if (isSweetBoxTE && topUrl && bottomUrl) {
+    // Show Dual Side-by-Side View
+    if (singleContainer) singleContainer.style.display = "none";
+    if (verticalContainer) verticalContainer.style.display = "none";
+    if (dualContainer) {
+      dualContainer.style.display = "flex";
+      const imgLid = document.getElementById("fullViewImageLid");
+      const imgTub = document.getElementById("fullViewImageTub");
+      if (imgLid) imgLid.src = topUrl;
+      if (imgTub) imgTub.src = bottomUrl;
+    }
+  } else if (isSweetBox && topUrl && bottomUrl) {
+    // Show Dual Vertical View (60/30)
+    if (singleContainer) singleContainer.style.display = "none";
+    if (dualContainer) dualContainer.style.display = "none";
+    if (verticalContainer) {
+      verticalContainer.style.display = "flex";
+      const imgLidVer = document.getElementById("fullViewImageLidVertical");
+      const imgTubVer = document.getElementById("fullViewImageTubVertical");
+      if (imgLidVer) imgLidVer.src = topUrl;
+      if (imgTubVer) imgTubVer.src = bottomUrl;
+    }
+  } else {
+    // Show Single View (Standard)
+    if (dualContainer) dualContainer.style.display = "none";
+    if (verticalContainer) verticalContainer.style.display = "none";
+    if (singleContainer) {
+      singleContainer.style.display = "flex";
+      fullViewCurrentIndex = 0;
+      updateFullViewModal();
+    }
+  }
 
   const modal = document.getElementById("fullViewModal");
   if (modal) {

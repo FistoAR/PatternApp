@@ -129,12 +129,39 @@
 
           <!-- Full View Pattern Modal -->
           <div id="fullViewModal" class="modal" style="z-index: 99999; background: rgba(0,0,0,0.85);">
-            <div style="position: absolute; top: 2vw; right: 2.5vw; font-size: 2vw; color: white; cursor: pointer; transition: color 0.2s; z-index: 2;" id="closeFullViewModal" onmouseover="this.style.color='#f00'" onmouseout="this.style.color='white'">
+            <div style="position: absolute; top: 2vw; right: 2.5vw; font-size: 2vw; color: white; cursor: pointer; transition: color 0.2s; z-index: 100;" id="closeFullViewModal" onmouseover="this.style.color='#f00'" onmouseout="this.style.color='white'">
               <i class="fa-solid fa-xmark"></i>
             </div>
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative;">
-              <img id="fullViewImage" src="" style="max-width: 90%; max-height: 80vh; object-fit: contain; box-shadow: 0 4px 25px rgba(0,0,0,0.5); border-radius: 0.5vw; background: white;" />
-              <button id="fullViewNextBtn" class="save_btn" style="margin-top: 1.5vw; display: none; font-size: 1vw; min-width: 12vw; padding: 0.8vw 1.5vw;">Show Tub Image</button>
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative; padding: 2vw;">
+              <!-- Single Pattern View -->
+              <div id="fullViewSingle" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                <img id="fullViewImage" src="" style="max-width: 90%; max-height: 80vh; object-fit: contain; border-radius: 0.6vw;" />
+                <button id="fullViewNextBtn" class="save_btn" style="margin-top: 1.5vw; display: none; font-size: 1vw; min-width: 12vw; padding: 0.8vw 1.5vw;">Show Tub Image</button>
+              </div>
+              
+              <!-- Dual Pattern View (50/50) -->
+              <div id="fullViewDual" style="display: none; width: 95%; height: 85vh; gap: 2vw; align-items: center; justify-content: center;">
+                <div style="flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vw;">
+                  <h4 style="color: white; margin: 0; font-size: 1.2vw; font-weight: 500;">Lid Pattern</h4>
+                  <img id="fullViewImageLid" src="" style="max-width: 100%; max-height: calc(100% - 3vw); object-fit: contain; border-radius: 0.6vw;" />
+                </div>
+                <div style="flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vw;">
+                  <h4 style="color: white; margin: 0; font-size: 1.2vw; font-weight: 500;">Tub Pattern</h4>
+                  <img id="fullViewImageTub" src="" style="max-width: 100%; max-height: calc(100% - 3vw); object-fit: contain; border-radius: 0.6vw;" />
+                </div>
+              </div>
+
+              <!-- Vertical Pattern View (60/30) -->
+              <div id="fullViewVertical" style="display: none; width: 95%; height: 90vh; flex-direction: column; gap: 1vw; align-items: center; justify-content: flex-start;">
+                <div style="width: 100%; height: 60%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5vw;">
+                  <h4 style="color: white; margin: 0; font-size: 1vw; font-weight: 500;">Lid Pattern</h4>
+                  <img id="fullViewImageLidVertical" src="" style="max-width: 100%; max-height: calc(100% - 2vw); object-fit: contain; border-radius: 0.6vw;" />
+                </div>
+                <div style="width: 100%; height: 30%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5vw;">
+                  <h4 style="color: white; margin: 0; font-size: 1vw; font-weight: 500;">Tub Pattern</h4>
+                  <img id="fullViewImageTubVertical" src="" style="max-width: 100%; max-height: calc(100% - 2vw); object-fit: contain; border-radius: 0.6vw;" />
+                </div>
+              </div>
             </div>
           </div>
         </div>

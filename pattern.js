@@ -106,10 +106,37 @@ function initPatternLightbox() {
     <div id="lightbox-bg" class="lightbox-bg"></div>
     <div class="lightbox-container">
       <button class="lightbox-close" onclick="closePatternLightbox()"><i class="fa-solid fa-times"></i></button>
-      <div class="lightbox-content">
-        <img id="lightbox-img" src="" alt="Full Pattern">
-        <div id="lightbox-label" class="lightbox-label"></div>
+      
+      <!-- Single View -->
+      <div id="lightbox-content-single" class="lightbox-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+        <img id="lightbox-img" src="" alt="Full Pattern" style="max-width: 90%; max-height: 80vh; object-fit: contain; border-radius: 0.6vw;">
+        <div id="lightbox-label" class="lightbox-label" style="margin-top: 1.5vw;"></div>
       </div>
+
+      <!-- Dual Side-by-Side View (50/50) -->
+      <div id="lightbox-content-dual" style="display: none; width: 95%; height: 85vh; gap: 2vw; align-items: center; justify-content: center; z-index: 10;">
+        <div style="flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vw;">
+           <h4 style="color: white; margin: 0; font-size: 1.2vw; font-weight: 500;">Lid Pattern</h4>
+           <img id="lightbox-img-lid" src="" style="max-width: 100%; max-height: calc(100% - 3vw); object-fit: contain; border-radius: 0.6vw;" />
+        </div>
+        <div style="flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vw;">
+           <h4 style="color: white; margin: 0; font-size: 1.2vw; font-weight: 500;">Tub Pattern</h4>
+           <img id="lightbox-img-tub" src="" style="max-width: 100%; max-height: calc(100% - 3vw); object-fit: contain; border-radius: 0.6vw;" />
+        </div>
+      </div>
+
+      <!-- Vertical View (60/30) -->
+      <div id="lightbox-content-vertical" style="display: none; width: 95%; height: 90vh; flex-direction: column; gap: 1vw; align-items: center; justify-content: flex-start; z-index: 10;">
+        <div style="width: 100%; height: 60%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5vw;">
+           <h4 style="color: white; margin: 0; font-size: 1vw; font-weight: 500;">Lid Pattern</h4>
+           <img id="lightbox-img-lid-ver" src="" style="max-width: 100%; max-height: calc(100% - 2vw); object-fit: contain; border-radius: 0.6vw;" />
+        </div>
+        <div style="width: 100%; height: 30%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5vw;">
+           <h4 style="color: white; margin: 0; font-size: 1vw; font-weight: 500;">Tub Pattern</h4>
+           <img id="lightbox-img-tub-ver" src="" style="max-width: 100%; max-height: calc(100% - 2vw); object-fit: contain; border-radius: 0.6vw;" />
+        </div>
+      </div>
+
       <button id="lightbox-next-btn" class="lightbox-nav-btn next" onclick="toggleLightboxPattern(event)">
         <span>Next</span> <i class="fa-solid fa-arrow-right"></i>
       </button>
@@ -144,27 +171,61 @@ window.toggleLightboxPattern = function (event) {
 
 function updateLightboxView() {
   const { p, view } = currentLightboxData;
-  const imgEl = document.getElementById("lightbox-img");
-  const bgEl = document.getElementById("lightbox-bg");
-  const labelEl = document.getElementById("lightbox-label");
-  const nextBtn = document.getElementById("lightbox-next-btn");
   const baseUrl = `https://terratechpacks.com/App_3D/Patterns/`;
 
-  const fileName =
-    (view === "lid" ? p.pattern_url_top : p.pattern_url) ||
-    p.pattern_url_top ||
-    p.pattern_url;
-  const fullUrl = baseUrl + encodeURIComponent(fileName);
+  const sLower = (p.shape_type || "").toLowerCase().replace(/_/g, " ");
+  const isSweetBox = sLower === "sweet box";
+  const isSweetBoxTE =
+    sLower === "sweet box tamper evident" || sLower === "sweet box te";
 
-  imgEl.src = fullUrl;
-  if (bgEl)
-    bgEl.style.backgroundImage = `url('${fullUrl.replace(/'/g, "\\'")}')`;
-  labelEl.textContent = view === "lid" ? "Lid Pattern" : "Tub Pattern";
+  const singleBox = document.getElementById("lightbox-content-single");
+  const dualBox = document.getElementById("lightbox-content-dual");
+  const verticalBox = document.getElementById("lightbox-content-vertical");
+  const nextBtn = document.getElementById("lightbox-next-btn");
+  const bgEl = document.getElementById("lightbox-bg");
 
-  if (p.pattern_url && p.pattern_url_top) {
-    nextBtn.style.display = "flex";
+  const urlTop = p.pattern_url_top ? baseUrl + encodeURIComponent(p.pattern_url_top) : null;
+  const urlTub = p.pattern_url ? baseUrl + encodeURIComponent(p.pattern_url) : null;
+
+  // Single default image (same as before for fallback)
+  const mainUrl = (view === "lid" ? p.pattern_url_top : p.pattern_url) || p.pattern_url_top || p.pattern_url;
+  const fullUrl = baseUrl + encodeURIComponent(mainUrl);
+
+  if (isSweetBoxTE && urlTop && urlTub) {
+    if (singleBox) singleBox.style.display = "none";
+    if (verticalBox) verticalBox.style.display = "none";
+    if (dualBox) {
+      dualBox.style.display = "flex";
+      document.getElementById("lightbox-img-lid").src = urlTop;
+      document.getElementById("lightbox-img-tub").src = urlTub;
+    }
+    if (nextBtn) nextBtn.style.display = "none";
+  } else if (isSweetBox && urlTop && urlTub) {
+    if (singleBox) singleBox.style.display = "none";
+    if (dualBox) dualBox.style.display = "none";
+    if (verticalBox) {
+      verticalBox.style.display = "flex";
+      document.getElementById("lightbox-img-lid-ver").src = urlTop;
+      document.getElementById("lightbox-img-tub-ver").src = urlTub;
+    }
+    if (nextBtn) nextBtn.style.display = "none";
   } else {
-    nextBtn.style.display = "none";
+    if (dualBox) dualBox.style.display = "none";
+    if (verticalBox) verticalBox.style.display = "none";
+    if (singleBox) {
+      singleBox.style.display = "flex";
+      const imgEl = document.getElementById("lightbox-img");
+      const labelEl = document.getElementById("lightbox-label");
+      imgEl.src = fullUrl;
+      labelEl.textContent = view === "lid" ? "Lid Pattern" : "Tub Pattern";
+    }
+    if (nextBtn) {
+      nextBtn.style.display = p.pattern_url && p.pattern_url_top ? "flex" : "none";
+    }
+  }
+
+  if (bgEl) {
+    bgEl.style.backgroundImage = `url('${fullUrl.replace(/'/g, "\\'")}')`;
   }
 }
 
