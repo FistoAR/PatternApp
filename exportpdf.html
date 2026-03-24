@@ -57,6 +57,35 @@
               <i class="fa-solid fa-cloud-arrow-down"></i> Export
             </button>
           </div>
+          <div class="model-view-top-left-controls glass-control">
+            <div class="shadow-option">
+              <label for="shadowIntensity">Shadow Intensity</label>
+              <input type="range" id="shadowIntensity" min="0" max="2" step="0.1" value="1" />
+            </div>
+            <div class="shadow-option">
+              <label for="shadowSoftness">Shadow Softness</label>
+              <input type="range" id="shadowSoftness" min="0" max="1" step="0.1" value="1" />
+            </div>
+            <div class="shadow-option">
+              <label for="rotationAngle">Model Rotation (H, V)</label>
+              <div class="rotation-input-wrapper">
+                <input type="text" id="rotationAngle" value="0 , 0" />
+                <button id="copyToAllBtn" class="copy-logo-btn" title="Copy rotation to all rendered models">
+                  <i class="fa-solid fa-copy"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="model-view-top-right-controls">
+            <div class="toggle-switch glass-control">
+              <span>Remove Default Design</span>
+              <label class="switch">
+                <input type="checkbox" id="removeDefaultDesign" />
+                <span class="slider round"></span>
+              </label>
+            </div>
+          </div>
 
           <div class="model-view-left-controls">
             <label class="checkbox-label glass-control">
@@ -113,7 +142,7 @@
               <label for="textureTitle">Texture Name <span style="color: red;">*</span></label>
               <input type="text" id="textureTitle" placeholder="Enter Theme Name" />
 
-              <div class="input-row" id="textureUploadRow" style="margin-bottom: 0.5vw;">
+              <div class="input-row" id="textureUploadRow" style="margin-bottom: 0.2vw;">
                 <div class="input-group" id="lidTextureGroup" style="flex: 1; display: none;">
                   <label for="lidTextureFile">Lid Texture <span style="color: red;">*</span></label>
                   <div class="file-upload-wrapper">
@@ -130,6 +159,9 @@
                     <span id="fileName">No file chosen</span>
                   </div>
                 </div>
+              </div>
+              <div id="toggleNote" style="display: none; color: #fb3838; font-size: 0.70vw; font-weight: 500; white-space: nowrap; opacity: 1; text-align: left;">
+                <i class="fa-solid fa-circle-info"></i> Disable "Remove Default Design" to upload textures.
               </div>
             </div>
 

@@ -14,10 +14,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const clearAllBtn = document.getElementById("clearAllBtn");
   const scrollLeftBtn = document.getElementById("scrollLeftBtn");
   const scrollRightBtn = document.getElementById("scrollRightBtn");
+  const rotationAngleInput = document.getElementById("rotationAngle");
+  const copyToAllBtn = document.getElementById("copyToAllBtn");
 
   // Transparency Checkboxes
   const tubTransparent = document.getElementById("tubTransparent");
   const lidTransparent = document.getElementById("lidTransparent");
+  const removeDefaultDesign = document.getElementById("removeDefaultDesign");
 
   // Dual Texture Upload Elements
   const lidTextureFile = document.getElementById("lidTextureFile");
@@ -60,8 +63,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const modelSrc =
     "./assets/Angles/round-containers/120ml-round/120ml-main.glb";
-  const TubColorMaterials = ["tub", "Tub", "bottom"];
-  const LidColorMaterials = ["lid", "Lid", "top"];
+  const TubColorMaterials = ["tub", "Tub", "bottom", "white_label"];
+  const LidColorMaterials = ["lid", "Lid", "top", "white_label.top"];
   const TubTextureMaterials = ["tub_label", "bottom_label"];
   const LidTextureMaterials = ["lid_label", "top_label"];
   const viewerTextureCache = new WeakMap();
@@ -120,6 +123,9 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    const isRemovingDefault =
+      removeDefaultDesign && removeDefaultDesign.checked;
+
     // 1. Apply Lid State
     updatePartTransparency(
       viewer,
@@ -136,7 +142,95 @@ window.addEventListener("DOMContentLoaded", () => {
       tubColorManualSet ? tubColor.value : null,
     );
 
-    // 3. Apply Tub Texture (if any)
+    // 3. Clear or Restore textures based on "Remove Default" toggle
+    if (viewer.model) {
+      viewer.model.materials.forEach((mat) => {
+        const matNameLower = mat.name.toLowerCase();
+        const altText = viewer.getAttribute("alt")?.toLowerCase() || "";
+        const srcText = viewer.src?.toLowerCase() || "";
+        const isSweetBoxTE = altText.includes("sweet box te") || altText.includes("sweet box tamper") || srcText.includes("sweet_box_te") || srcText.includes("sweet-box-te");
+        
+        const isTubTag =
+          TubTextureMaterials.some((n) =>
+            matNameLower.includes(n.toLowerCase()),
+          ) || (isSweetBoxTE && matNameLower.includes("white_label"));
+            
+        const isLidTag = LidTextureMaterials.some((n) =>
+          matNameLower.includes(n.toLowerCase()),
+        );
+
+        if (isTubTag || isLidTag) {
+          // ENSURE EXPLICIT CACHE of original texture before it's gone
+          if (!originalMaterialsCache.has(mat)) {
+            originalMaterialsCache.set(mat, {
+              baseColorFactor: [...mat.pbrMetallicRoughness.baseColorFactor],
+              emissiveFactor: [...mat.emissiveFactor],
+              metallicFactor: mat.pbrMetallicRoughness.metallicFactor,
+              roughnessFactor: mat.pbrMetallicRoughness.roughnessFactor,
+              alphaMode: mat.alphaMode,
+              originalTexture:
+                mat.pbrMetallicRoughness.baseColorTexture?.texture,
+            });
+          }
+
+          const hasUserTexture = isTubTag
+            ? !!currentTubTextureDataURL
+            : !!currentLidTextureDataURL;
+
+          // If it's a "white_label" on TE, it never receives the tub texture upload, so if we're removing defaults, it must ALWAYS be hidden.
+          const isWhiteLabelTE = isSweetBoxTE && matNameLower.includes("white_label");
+          const shouldHide = isRemovingDefault && (!hasUserTexture || isWhiteLabelTE);
+
+          if (shouldHide) {
+              if (mat.pbrMetallicRoughness.baseColorTexture) {
+                mat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+              }
+              
+              const isCommonLabel = matNameLower.includes("tub_label") || matNameLower.includes("lid_label");
+              
+              // Ensure alpha is 0 when the design is "removed"
+              mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
+              mat.setAlphaMode("BLEND");
+              
+              if (isWhiteLabel || isCommonLabel) {
+                // To completely eliminate the "white shade" transparent ghosting,
+                // we must also turn off specular reflections and emissions for these specific tags
+                mat.pbrMetallicRoughness.setMetallicFactor(0);
+                mat.pbrMetallicRoughness.setRoughnessFactor(1);
+                mat.setEmissiveFactor([0, 0, 0]);
+              }
+              
+            } else if (!hasUserTexture) {
+              // Restore from cache
+              const defaults = originalMaterialsCache.get(mat);
+              if (defaults) {
+                if (
+                  mat.pbrMetallicRoughness.baseColorTexture &&
+                  defaults.originalTexture
+                ) {
+                  mat.pbrMetallicRoughness.baseColorTexture.setTexture(
+                    defaults.originalTexture,
+                  );
+                }
+                // Restore original appearance
+                mat.pbrMetallicRoughness.setBaseColorFactor(
+                  defaults.baseColorFactor,
+                );
+                mat.setAlphaMode(defaults.alphaMode);
+                mat.pbrMetallicRoughness.setMetallicFactor(
+                  defaults.metallicFactor,
+                );
+                mat.pbrMetallicRoughness.setRoughnessFactor(
+                  defaults.roughnessFactor,
+                );
+                mat.setEmissiveFactor(defaults.emissiveFactor);
+              }
+            }
+          }
+      });
+    }
+
+    // 4. Apply Tub Texture (if any)
     if (currentTubTextureDataURL) {
       await tryApplyMaterialTexture(
         viewer,
@@ -145,7 +239,7 @@ window.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    // 4. Apply Lid Texture (if any)
+    // 5. Apply Lid Texture (if any)
     if (currentLidTextureDataURL) {
       await tryApplyMaterialTexture(
         viewer,
@@ -365,6 +459,8 @@ window.addEventListener("DOMContentLoaded", () => {
           mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
           // Always reset color factor to white for stickers/labels to ensure original texture color
           mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+          const defaults = originalMaterialsCache.get(mat);
+          mat.setAlphaMode(defaults ? defaults.alphaMode : "OPAQUE");
           console.info("Applied texture to: " + mat);
         } else {
           console.warn(
@@ -449,7 +545,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           if (colorHex.toLowerCase() === "#ffffff") {
             mat.pbrMetallicRoughness.setMetallicFactor(1.0);
-            mat.pbrMetallicRoughness.setRoughnessFactor(0.53);
+            mat.pbrMetallicRoughness.setRoughnessFactor(0.39); // Premium White look (restored)
           } else {
             mat.pbrMetallicRoughness.setMetallicFactor(0.0);
             mat.pbrMetallicRoughness.setRoughnessFactor(1.0);
@@ -498,9 +594,149 @@ window.addEventListener("DOMContentLoaded", () => {
     syncViewerState(modelViewer);
   });
 
+  const toggleNote = document.getElementById("toggleNote");
+
+  if (removeDefaultDesign) {
+    removeDefaultDesign.addEventListener("change", () => {
+      const isEnabled = removeDefaultDesign.checked;
+
+      if (toggleNote) toggleNote.style.display = isEnabled ? "block" : "none";
+      if (fileName) fileName.style.display = isEnabled ? "none" : "block";
+      if (lidFileName) lidFileName.style.display = isEnabled ? "none" : "block";
+
+      if (isEnabled) {
+        resetTextureInputs();
+      } else {
+        if (fileName) fileName.textContent = "No file chosen";
+        if (lidFileName) lidFileName.textContent = "No file chosen";
+        updateMainViewer();
+      }
+
+      const tubLabel = document.querySelector(
+        'label[for="textureFile"].file-upload',
+      );
+      const lidLabel = document.querySelector(
+        'label[for="lidTextureFile"].file-upload',
+      );
+
+      if (isEnabled) {
+        textureFile.disabled = true;
+        lidTextureFile.disabled = true;
+        if (tubLabel) {
+          tubLabel.style.opacity = "0.5";
+          tubLabel.classList.add("disabled-ui");
+        }
+        if (lidLabel) {
+          lidLabel.style.opacity = "0.5";
+          lidLabel.classList.add("disabled-ui");
+        }
+      } else {
+        textureFile.disabled = false;
+        lidTextureFile.disabled = false;
+        if (tubLabel) {
+          tubLabel.style.opacity = "1";
+          tubLabel.classList.remove("disabled-ui");
+        }
+        if (lidLabel) {
+          lidLabel.style.opacity = "1";
+          lidLabel.classList.remove("disabled-ui");
+        }
+      }
+
+      syncViewerState(modelViewer);
+      checkFormValidity();
+    });
+  }
+
+  // Shadow Controls
+  const shadowIntensity = document.getElementById("shadowIntensity");
+  const shadowSoftness = document.getElementById("shadowSoftness");
+
+  if (shadowIntensity) {
+    shadowIntensity.addEventListener("input", (e) => {
+      if (modelViewer) {
+        modelViewer.setAttribute("shadow-intensity", e.target.value);
+      }
+    });
+  }
+
+  if (shadowSoftness) {
+    shadowSoftness.addEventListener("input", (e) => {
+      if (modelViewer) {
+        modelViewer.setAttribute("shadow-softness", e.target.value);
+      }
+    });
+  }
+
+  // Model Rotation Controls
+  if (rotationAngleInput) {
+    rotationAngleInput.addEventListener("input", (e) => {
+      if (modelViewer) {
+        const val = e.target.value;
+        const parts = val.split(/[ ,/]+/).filter(Boolean);
+        if (parts.length >= 2) {
+          const h = parseFloat(parts[0]) || 0;
+          const v = parseFloat(parts[1]) || 0;
+          const orbit = modelViewer.getCameraOrbit();
+          modelViewer.cameraOrbit = `${h}deg ${v}deg ${orbit.radius}m`;
+        } else if (parts.length === 1) {
+          const h = parseFloat(parts[0]) || 0;
+          const orbit = modelViewer.getCameraOrbit();
+          modelViewer.cameraOrbit = `${h}deg ${orbit.phi}rad ${orbit.radius}m`;
+        }
+      }
+    });
+
+    modelViewer.addEventListener("camera-change", () => {
+      const orbit = modelViewer.getCameraOrbit();
+      if (orbit) {
+        const h = Math.round((orbit.theta * 180) / Math.PI);
+        const v = Math.round((orbit.phi * 180) / Math.PI);
+        // Display as "H , V"
+        rotationAngleInput.value = `${h} , ${v}`;
+      }
+    });
+  }
+
+  if (copyToAllBtn) {
+    copyToAllBtn.addEventListener("click", () => {
+      const val = rotationAngleInput.value;
+      navigator.clipboard.writeText(val).then(() => {
+        const icon = copyToAllBtn.querySelector("i");
+        icon.classList.replace("fa-copy", "fa-check");
+        setTimeout(() => {
+          icon.classList.replace("fa-check", "fa-copy");
+        }, 1500);
+      });
+    });
+  }
+
   bgColor.addEventListener("input", () => {
-    modelbg.style.background = bgColor.value;
+    const color = bgColor.value;
+    modelbg.style.background = color;
+    updateBackgroundLuminance(color);
   });
+
+  function updateBackgroundLuminance(hex) {
+    if (!hex) return;
+    const rgb = hexToRgb(hex);
+    if (!rgb) return;
+
+    // YIQ formula
+    const yiq =
+      (rgb.r * 255 * 299 + rgb.g * 255 * 587 + rgb.b * 255 * 114) / 1000;
+
+    if (yiq < 128) {
+      modelbg.classList.add("dark-bg");
+    } else {
+      modelbg.classList.remove("dark-bg");
+    }
+  }
+
+  // Initialize background luminance on load
+  if (bgColor) {
+    updateBackgroundLuminance(bgColor.value);
+  }
 
   function checkFormValidity() {
     const fileWrapper = textureFile.closest(".file-upload-wrapper");
@@ -520,19 +756,22 @@ window.addEventListener("DOMContentLoaded", () => {
       textureTitle.classList.remove("valid-highlight", "error-highlight");
     }
 
+    const isRemoveDefaultEnabled =
+      removeDefaultDesign && removeDefaultDesign.checked;
+
     // Highlight File
-    if (hasFile) {
+    if (hasFile || isRemoveDefaultEnabled) {
       fileWrapper.classList.remove("error-highlight");
-      fileWrapper.classList.add("valid-highlight");
+      if (hasFile) fileWrapper.classList.add("valid-highlight");
     } else {
       fileWrapper.classList.remove("valid-highlight", "error-highlight");
     }
 
     // Highlight Lid File (if visible)
     if (isLidVisible) {
-      if (hasLidFile) {
+      if (hasLidFile || isRemoveDefaultEnabled) {
         lidFileWrapper.classList.remove("error-highlight");
-        lidFileWrapper.classList.add("valid-highlight");
+        if (hasLidFile) lidFileWrapper.classList.add("valid-highlight");
       } else {
         lidFileWrapper.classList.remove("valid-highlight", "error-highlight");
       }
@@ -848,6 +1087,9 @@ window.addEventListener("DOMContentLoaded", () => {
     fileWrapper.classList.remove("error-highlight");
     lidFileWrapper.classList.remove("error-highlight");
 
+    const isRemoveDefaultEnabled =
+      removeDefaultDesign && removeDefaultDesign.checked;
+
     // Validate
     let isValid = true;
 
@@ -858,14 +1100,14 @@ window.addEventListener("DOMContentLoaded", () => {
       isValid = false;
     }
 
-    if (!tubFile) {
+    if (!tubFile && !isRemoveDefaultEnabled) {
       fileWrapper.classList.remove("valid-highlight");
       fileWrapper.classList.add("error-highlight");
       setTimeout(() => fileWrapper.classList.remove("error-highlight"), 2000);
       isValid = false;
     }
 
-    if (isDualMode && !lidFile) {
+    if (isDualMode && !lidFile && !isRemoveDefaultEnabled) {
       lidFileWrapper.classList.remove("valid-highlight");
       lidFileWrapper.classList.add("error-highlight");
       setTimeout(
@@ -879,113 +1121,175 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const tubReader = new FileReader();
-    tubReader.onload = async (event) => {
-      const tubTextureDataURL = event.target.result;
-      let lidTextureDataURL = null;
+    const finalizeRenderWithTextures = async () => {
+      const tubReader = new FileReader();
+      tubReader.onload = async (event) => {
+        const tubTextureDataURL = event.target.result;
+        let lidTextureDataURL = null;
 
-      const finalizeRender = async (lidDataURL) => {
-        const currentModelSrc = modelViewer.getAttribute("src");
-        let snapshotDataURL = null;
-        try {
-          const modelDataURL = modelViewer.toDataURL({ mimeType: "image/png" });
-          const modelImg = await new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.src = modelDataURL;
-          });
-          const canvas = document.createElement("canvas");
-          canvas.width = modelImg.width;
-          canvas.height = modelImg.height;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = backgroundColor;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(modelImg, 0, 0);
-          snapshotDataURL = canvas.toDataURL("image/png", 1.0);
-        } catch (err) {
-          console.error("Failed to capture model snapshot:", err);
-        }
-
-        const orbit = modelViewer.getCameraOrbit();
-        const currentLiveOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg ${orbit.radius.toFixed(4)}m`;
-        const currentLiveFOV = `${modelViewer.getFieldOfView().toFixed(2)}deg`;
-        const target = modelViewer.getCameraTarget();
-        const currentLiveTarget = `${target.x}m ${target.y}m ${target.z}m`;
-
-        const card = createRenderedCard(
-          tubTextureDataURL,
-          title,
-          lidColorManualSet ? topMaterialColor : null,
-          currentModelSrc,
-          snapshotDataURL,
-          backgroundColor,
-          lidDataURL,
-          currentLiveOrbit,
-          currentLiveFOV,
-          tubColorManualSet ? tubColor.value : null,
-          tubTransparent.checked,
-          lidTransparent.checked,
-          currentLiveTarget,
-        );
-        renderedImages.appendChild(card);
-        renderedModels.push(card);
-        card.classList.add("selected");
-        updateSelectionInfo();
-
-        // Scroll to the new card
-        setTimeout(() => {
-          renderedImages.scrollTo({
-            left: renderedImages.scrollWidth,
-            behavior: "smooth",
-          });
-        }, 100);
-
-        // Clear form
-        resetTextureInputs();
-        topColor.value = "#ffffff";
-        bgColor.value = "#c7c7c7";
-        tubTransparent.checked = false;
-        lidTransparent.checked = false;
-        lidColorManualSet = false;
-        tubColorManualSet = false;
-        lidTransparencyManualSet = false;
-        tubTransparencyManualSet = false;
-        modelbg.style.backgroundColor = "#c7c7c7";
-        checkFormValidity();
-
-        // Reset model materials
-        if (modelViewer.model) {
-          const bottomMat = modelViewer.model.materials.find((m) =>
-            TubColorMaterials.includes(m.name),
-          );
-          if (bottomMat) {
-            bottomMat.pbrMetallicRoughness.baseColorTexture.setTexture(
-              originalBottomTexture || null,
-            );
+        const finalizeRender = async (lidDataURL) => {
+          const currentModelSrc = modelViewer.getAttribute("src");
+          let snapshotDataURL = null;
+          try {
+            const modelDataURL = modelViewer.toDataURL({
+              mimeType: "image/png",
+            });
+            const modelImg = await new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => resolve(img);
+              img.src = modelDataURL;
+            });
+            const canvas = document.createElement("canvas");
+            canvas.width = modelImg.width;
+            canvas.height = modelImg.height;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = backgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(modelImg, 0, 0);
+            snapshotDataURL = canvas.toDataURL("image/png", 1.0);
+          } catch (err) {
+            console.error("Failed to capture model snapshot:", err);
           }
-          const topMat = modelViewer.model.materials.find((m) =>
-            LidColorMaterials.includes(m.name),
+
+          const orbit = modelViewer.getCameraOrbit();
+          const currentLiveOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg ${orbit.radius.toFixed(4)}m`;
+          const currentLiveFOV = `${modelViewer.getFieldOfView().toFixed(2)}deg`;
+          const target = modelViewer.getCameraTarget();
+          const currentLiveTarget = `${target.x}m ${target.y}m ${target.z}m`;
+
+          const card = createRenderedCard(
+            tubTextureDataURL,
+            title,
+            lidColorManualSet ? topMaterialColor : null,
+            currentModelSrc,
+            snapshotDataURL,
+            backgroundColor,
+            lidDataURL,
+            currentLiveOrbit,
+            currentLiveFOV,
+            tubColorManualSet ? tubColor.value : null,
+            tubTransparent.checked,
+            lidTransparent.checked,
+            currentLiveTarget,
           );
-          if (topMat) {
-            topMat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
-          }
-          
-          updatePartTransparency(modelViewer, "tub", false, null);
-          updatePartTransparency(modelViewer, "lid", false, null);
+          renderedImages.appendChild(card);
+          renderedModels.push(card);
+          card.classList.add("selected");
+          updateSelectionInfo();
+
+          // Scroll to the new card
+          setTimeout(() => {
+            renderedImages.scrollTo({
+              left: renderedImages.scrollWidth,
+              behavior: "smooth",
+            });
+          }, 100);
+
+          // Clear form
+          resetTextureInputs();
+          // DO NOT reset removeDefaultDesign or re-enable inputs here
+          // to comply with user request: "if i click render toggle automaticlly disable don't do that"
+
+          topColor.value = "#ffffff";
+          bgColor.value = "#c7c7c7";
+          tubTransparent.checked = false;
+          lidTransparent.checked = false;
+          lidColorManualSet = false;
+          tubColorManualSet = false;
+          lidTransparencyManualSet = false;
+          tubTransparencyManualSet = false;
+          modelbg.style.backgroundColor = "#c7c7c7";
+          checkFormValidity();
+        };
+
+        if (isDualMode && lidFile) {
+          const lidReader = new FileReader();
+          lidReader.onload = (e) => finalizeRender(e.target.result);
+          lidReader.readAsDataURL(lidFile);
+        } else {
+          finalizeRender(null);
         }
-        
-        syncViewerState(modelViewer);
       };
-
-      if (isDualMode && lidFile) {
-        const lidReader = new FileReader();
-        lidReader.onload = (e) => finalizeRender(e.target.result);
-        lidReader.readAsDataURL(lidFile);
-      } else {
-        finalizeRender(null);
-      }
+      tubReader.readAsDataURL(tubFile);
     };
-    tubReader.readAsDataURL(tubFile);
+
+    const finalizeRenderNoTextures = async () => {
+      const currentModelSrc = modelViewer.getAttribute("src");
+      let snapshotDataURL = null;
+      try {
+        const modelDataURL = modelViewer.toDataURL({ mimeType: "image/png" });
+        const modelImg = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.src = modelDataURL;
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = modelImg.width;
+        canvas.height = modelImg.height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(modelImg, 0, 0);
+        snapshotDataURL = canvas.toDataURL("image/png", 1.0);
+      } catch (err) {
+        console.error("Failed to capture model snapshot:", err);
+      }
+
+      const orbit = modelViewer.getCameraOrbit();
+      const currentLiveOrbit = `${((orbit.theta * 180) / Math.PI).toFixed(2)}deg ${((orbit.phi * 180) / Math.PI).toFixed(2)}deg ${orbit.radius.toFixed(4)}m`;
+      const currentLiveFOV = `${modelViewer.getFieldOfView().toFixed(2)}deg`;
+      const target = modelViewer.getCameraTarget();
+      const currentLiveTarget = `${target.x}m ${target.y}m ${target.z}m`;
+
+      const card = createRenderedCard(
+        null, // No tub texture
+        title,
+        lidColorManualSet ? topMaterialColor : null,
+        currentModelSrc,
+        snapshotDataURL,
+        backgroundColor,
+        null, // No lid texture
+        currentLiveOrbit,
+        currentLiveFOV,
+        tubColorManualSet ? tubColor.value : null,
+        tubTransparent.checked,
+        lidTransparent.checked,
+        currentLiveTarget,
+      );
+      renderedImages.appendChild(card);
+      renderedModels.push(card);
+      card.classList.add("selected");
+      updateSelectionInfo();
+
+      // Scroll to the new card
+      setTimeout(() => {
+        renderedImages.scrollTo({
+          left: renderedImages.scrollWidth,
+          behavior: "smooth",
+        });
+      }, 100);
+
+      // Clear form
+      resetTextureInputs();
+      // DO NOT reset removeDefaultDesign or re-enable inputs here
+
+      topColor.value = "#ffffff";
+      bgColor.value = "#c7c7c7";
+      tubTransparent.checked = false;
+      lidTransparent.checked = false;
+      lidColorManualSet = false;
+      tubColorManualSet = false;
+      lidTransparencyManualSet = false;
+      tubTransparencyManualSet = false;
+      modelbg.style.backgroundColor = "#c7c7c7";
+      checkFormValidity();
+    };
+
+    if (tubFile) {
+      await finalizeRenderWithTextures();
+    } else {
+      await finalizeRenderNoTextures();
+    }
   });
 
   const selectAllToggle = document.getElementById("selectAllToggle");
@@ -1925,8 +2229,12 @@ window.addEventListener("DOMContentLoaded", () => {
     mainModelViewer.setAttribute("max-field-of-view", "45deg");
     mainModelViewer.setAttribute("field-of-view", fov);
 
-    mainModelViewer.setAttribute("shadow-intensity", "1");
-    mainModelViewer.setAttribute("exposure", "1");
+    // Persist current slider values across angle/model changes
+    const curShadowIntensity = shadowIntensity?.value || "1";
+    const curShadowSoftness = shadowSoftness?.value || "1";
+
+    mainModelViewer.setAttribute("shadow-intensity", curShadowIntensity);
+    mainModelViewer.setAttribute("shadow-softness", curShadowSoftness);
     mainModelViewer.setAttribute("environment-image", "neutral");
 
     // Apply the stored camera orbit (including distance)

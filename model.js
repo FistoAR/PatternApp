@@ -184,7 +184,7 @@ function updateMaterialColor(
           // Premium White Effect: Metallic 1, Roughness 0.53
           if (lowerColor === "white" || color.toLowerCase() === "#ffffff") {
             mat.pbrMetallicRoughness.setMetallicFactor(1.0);
-            mat.pbrMetallicRoughness.setRoughnessFactor(0.53);
+            mat.pbrMetallicRoughness.setRoughnessFactor(0.39);
           } else {
             mat.pbrMetallicRoughness.setMetallicFactor(0.0);
             mat.pbrMetallicRoughness.setRoughnessFactor(0.9);
@@ -259,22 +259,37 @@ const MODEL_CATEGORIES = {
     {
       name: "120ml Round Container",
       path: "./assets/Model_with_logo/120ml_round_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.25m",
+      minCameraOrbit: "auto auto 0.25m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "250ml Round Container",
       path: "./assets/Model_with_logo/250ml_round_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.35m",
+      minCameraOrbit: "auto auto 0.35m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "300ml Round Container",
       path: "./assets/Model_with_logo/300ml_round_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.35m",
+      minCameraOrbit: "auto auto 0.35m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "500ml Round Container",
       path: "./assets/Model_with_logo/500ml_round_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.30m",
+      minCameraOrbit: "auto auto 0.30m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "750ml Round Container",
       path: "./assets/Model_with_logo/750ml_round_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.35m",
+      minCameraOrbit: "auto auto 0.35m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "1000ml Round Container",
@@ -285,20 +300,32 @@ const MODEL_CATEGORIES = {
     {
       name: "450ml/500gms Container",
       path: "./assets/Model_with_logo/450ml_round_square_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.35m",
+      minCameraOrbit: "auto auto 0.35m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "500ml Container",
       path: "./assets/Model_with_logo/500ml_round_square_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.33m",
+      minCameraOrbit: "auto auto 0.33m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
   ],
   Rectangle: [
     {
       name: "500ml Rectangular Container",
       path: "./assets/Model_with_logo/500ml_rectangle_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.45m",
+      minCameraOrbit: "auto auto 0.45m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "650ml Rectangular Container",
       path: "./assets/Model_with_logo/650ml_rectangle_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.45m",
+      minCameraOrbit: "auto auto 0.45m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "750ml Rectangular Container",
@@ -309,14 +336,23 @@ const MODEL_CATEGORIES = {
     {
       name: "250gms Sweet Box",
       path: "./assets/Model_with_logo/250gms_sweet_box_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.55m",
+      minCameraOrbit: "auto auto 0.55m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "500gms Sweet Box",
       path: "./assets/Model_with_logo/500gms_sweet_box_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.50m",
+      minCameraOrbit: "auto auto 0.50m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
     {
       name: "1kg Sweet Box",
       path: "./assets/Model_with_logo/1kg_sweet_box_with_logo.glb",
+      cameraOrbit: "0deg 75deg 0.50m",
+      minCameraOrbit: "auto auto 0.50m",
+      maxCameraOrbit: "auto auto 0.95m",
     },
   ],
   "Sweet Box Tamper Evident": [
@@ -740,7 +776,7 @@ async function selectModel(index) {
     state.autoPatternIdx = 0;
 
     // Reset pattern URLs to NULL whenever we change model type (Round -> Rectangle etc.)
-    // This allows the "load" event listener below to identify the NEW first compatible 
+    // This allows the "load" event listener below to identify the NEW first compatible
     // pattern for the fresh shape, avoiding any flicker from the previous model's pattern.
     state.patternUrl = null;
     state.patternUrlTop = null;
@@ -753,7 +789,7 @@ async function selectModel(index) {
     let minOrbit = selectedModel.minCameraOrbit || "auto auto 0.25m";
     let maxOrbit = selectedModel.maxCameraOrbit || "auto auto 0.95m";
     let orbit = selectedModel.cameraOrbit || "0deg 75deg auto";
-    
+
     mainViewer.setAttribute("min-camera-orbit", minOrbit);
     mainViewer.setAttribute("max-camera-orbit", maxOrbit);
     mainViewer.setAttribute("camera-orbit", orbit);
@@ -812,7 +848,7 @@ async function selectModel(index) {
           const minO = selectedModel.minCameraOrbit || "auto auto 0.25m";
           const maxO = selectedModel.maxCameraOrbit || "auto auto 0.95m";
           const orb = selectedModel.cameraOrbit || "0deg 75deg auto";
-          
+
           mainViewer.setAttribute("min-camera-orbit", minO);
           mainViewer.setAttribute("max-camera-orbit", maxO);
           mainViewer.setAttribute("camera-orbit", orb);
@@ -918,7 +954,11 @@ async function selectModel(index) {
 
         // ✅ RESUME CYCLE: Only restart the auto-cycle after everything is applied and model is ready
         const autoApplyToggle = document.getElementById("autoApplyToggle");
-        if (autoApplyToggle && autoApplyToggle.checked && state.allPatterns.length > 0) {
+        if (
+          autoApplyToggle &&
+          autoApplyToggle.checked &&
+          state.allPatterns.length > 0
+        ) {
           startPatternCycle(state.allPatterns, 2000, true);
         }
       } catch (err) {
@@ -2258,46 +2298,54 @@ async function preloadImages(urls = []) {
   if (!urls || urls.length === 0) return;
   const viewer = mainViewer || document.getElementById("mainViewer");
   if (!viewer) {
-    console.warn("[Preload] No viewer found, falling back to basic image preload.");
-    urls.forEach((url) => { if(url) (new Image()).src = url; });
+    console.warn(
+      "[Preload] No viewer found, falling back to basic image preload.",
+    );
+    urls.forEach((url) => {
+      if (url) new Image().src = url;
+    });
     return;
   }
 
-  console.log(`[Preload] Priming 3D texture cache for ${urls.length} images...`);
-  
+  console.log(
+    `[Preload] Priming 3D texture cache for ${urls.length} images...`,
+  );
+
   // Create textures in small batches to keep the GPU and UI thread responsive
   const batchSize = 3;
   let current = 0;
 
   const loadBatch = async () => {
     const batch = urls.slice(current, current + batchSize);
-    
-    await Promise.all(batch.map(async (url) => {
-      if (!url) return;
-      
-      let vcache = viewerTextureCache.get(viewer);
-      if (!vcache) {
-        vcache = new Map();
-        viewerTextureCache.set(viewer, vcache);
-      }
-      
-      const cacheKey = `${stripQuery(url)}_rot0`;
-      // If already in cache (either from previous preload or manual use), skip
-      if (vcache.has(cacheKey)) return;
 
-      try {
-        // This is the heavy lifting: pre-creating the WebGL texture
-        const tex = await viewer.createTexture(url);
-        vcache.set(cacheKey, tex);
-      } catch (e) {
-        // Silent fail for background preloading
-      }
-    }));
-    
+    await Promise.all(
+      batch.map(async (url) => {
+        if (!url) return;
+
+        let vcache = viewerTextureCache.get(viewer);
+        if (!vcache) {
+          vcache = new Map();
+          viewerTextureCache.set(viewer, vcache);
+        }
+
+        const cacheKey = `${stripQuery(url)}_rot0`;
+        // If already in cache (either from previous preload or manual use), skip
+        if (vcache.has(cacheKey)) return;
+
+        try {
+          // This is the heavy lifting: pre-creating the WebGL texture
+          const tex = await viewer.createTexture(url);
+          vcache.set(cacheKey, tex);
+        } catch (e) {
+          // Silent fail for background preloading
+        }
+      }),
+    );
+
     current += batchSize;
     if (current < urls.length) {
       // Slight delay between batches to allow for render frames
-      setTimeout(loadBatch, 400); 
+      setTimeout(loadBatch, 400);
     } else {
       console.log("[Preload] 3D cache priming complete.");
     }
@@ -2896,7 +2944,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const uniqueUrls = [...new Set(allUrls)];
     preloadImages(uniqueUrls);
 
-    if (autoApplyToggle && autoApplyToggle.checked && state.allPatterns.length > 0) {
+    if (
+      autoApplyToggle &&
+      autoApplyToggle.checked &&
+      state.allPatterns.length > 0
+    ) {
       startPatternCycle(state.allPatterns, 2000);
     }
   }
@@ -3022,11 +3074,9 @@ function openPatternFullView(bottomUrl, topUrl) {
   if (fullViewImages.length === 0) return;
 
   const selectedModel = state.thumbnails[state.selectedIndex];
-  const isSweetBox =
-    selectedModel && selectedModel.shape === "Sweet Box";
+  const isSweetBox = selectedModel && selectedModel.shape === "Sweet Box";
   const isSweetBoxTE =
-    selectedModel &&
-    selectedModel.shape === "Sweet Box Tamper Evident";
+    selectedModel && selectedModel.shape === "Sweet Box Tamper Evident";
 
   const singleContainer = document.getElementById("fullViewSingle");
   const dualContainer = document.getElementById("fullViewDual");

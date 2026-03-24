@@ -49,7 +49,40 @@
   src: url('./fonts/roboto-v49-latin-600.woff2') format('woff2');
 }
 
+/* Contrast adjustments for dark background */
+.model_view.dark-bg .shadow-option label,
+.model_view.dark-bg .glass-control span {
+  color: #fff !important;
+}
+
+.shadow-option label,
+.glass-control span {
+    transition: color 0.3s ease;
+}
+
+.model_view.dark-bg .model-view-controls,
+.model_view.dark-bg .model-view-top-left-controls,
+.model_view.dark-bg .model-view-top-right-controls,
+.model_view.dark-bg .model-view-left-controls {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.model_view.dark-bg .shadow-option input[type="range"] {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.model_view.dark-bg .slider {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.model_view.dark-bg .glass-control:hover span {
+    color: #fff;
+    opacity: 0.8;
+}
+
 body {
+
   background-color: var(--bg-color);
   color: #333;
   overflow: hidden;
@@ -177,6 +210,207 @@ body {
   border-radius: 0.8vw;
   border: 0.05vw solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 0.4vw 1.2vw rgba(0, 0, 0, 0.1);
+}
+
+.model-view-top-left-controls {
+  position: absolute;
+  top: 1.2vw;
+  left: 1.2vw;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8vw;
+  padding: 0.8vw 1.2vw;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border-radius: 0.8vw;
+  border: 0.05vw solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0.4vw 1.2vw rgba(0, 0, 0, 0.1);
+  min-width: 12vw;
+  align-items: stretch;
+}
+
+.shadow-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3vw;
+  width: 100%;
+  align-items: stretch;
+}
+
+.shadow-option label {
+  font-size: 0.6vw;
+  font-weight: 500;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.03vw;
+  text-align: left;
+}
+
+.shadow-option input[type="range"] {
+  width: 100%;
+  height: 0.3vw;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 0.15vw;
+  outline: none;
+}
+
+.shadow-option input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 0.8vw;
+  height: 0.8vw;
+  background: #dfab0c;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0.1vw 0.3vw rgba(0,0,0,0.1);
+}
+
+.rotation-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.rotation-input-wrapper input {
+  width: 100%;
+  padding: 0.3vw 2vw 0.3vw 0.5vw;
+  font-size: 0.75vw;
+  border-radius: 0.4vw;
+  border: 0.05vw solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.3);
+  color: #333;
+  outline: none;
+  transition: all 0.3s;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.rotation-input-wrapper input::-webkit-outer-spin-button,
+.rotation-input-wrapper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rotation-input-wrapper input:focus {
+  border-color: #dfab0c;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.copy-logo-btn {
+  position: absolute;
+  right: 0.5vw;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7vw;
+  color: #666;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.copy-logo-btn:hover {
+  color: #dfab0c;
+}
+
+.model_view.dark-bg .rotation-input-wrapper input {
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.model_view.dark-bg .copy-logo-btn {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.model_view.dark-bg .copy-logo-btn:hover {
+  color: #ffc107;
+}
+
+.model-view-top-right-controls {
+  position: absolute;
+  top: 1.2vw;
+  right: 1.2vw;
+  display: flex;
+  align-items: center;
+  gap: 1.2vw;
+  z-index: 50;
+  padding: 0.6vw 1.2vw;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border-radius: 0.8vw;
+  border: 0.05vw solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0.4vw 1.2vw rgba(0, 0, 0, 0.1);
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.7vw;
+}
+
+.toggle-switch span {
+  font-size: 0.7vw;
+  font-weight: 500;
+  color: #333;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 2.2vw;
+  height: 1.2vw;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 0.9vw;
+  width: 0.9vw;
+  left: 0.15vw;
+  bottom: 0.15vw;
+  background-color: white;
+  transition: .4s;
+  box-shadow: 0 0.1vw 0.3vw rgba(0,0,0,0.1);
+}
+
+input:checked + .slider {
+  background-color: #dfab0c;
+}
+
+input:checked + .slider:before {
+  transform: translateX(1.0vw);
+}
+
+.slider.round {
+  border-radius: 1.5vw;
+}
+
+.slider.round:before {
+  border-radius: 50%;
 }
 
 .model-view-left-controls {
@@ -529,12 +763,21 @@ body {
 #fileName, #lidFileName {
   font-size: 0.7vw;
   color: #888;
-  margin-top: 0.2vw;
+  margin-top: 0.4vw;
   display: block;
+  white-space: nowrap;
+  overflow: visible;
 }
 
 #textureUploadRow .file-upload {
   width: 100%;
+}
+
+.file-upload.disabled-ui {
+  cursor: not-allowed !important;
+  opacity: 0.5;
+  background-color: #f0f0f0 !important;
+  pointer-events: none; /* This also disables hover and click entirely */
 }
 
 .model_input .input-section {
