@@ -95,11 +95,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!viewer || !viewer.model) return;
 
     // Sync pickers with model defaults on first load (if not manually set)
-    const firstLid = viewer.model.materials.find((m) =>
-      LidColorMaterials.includes(m.name),
+    const firstLid = viewer.model.materials.find(
+      (m) => m.name === "lid" || m.name === "Lid",
     );
-    const firstTub = viewer.model.materials.find((m) =>
-      TubColorMaterials.includes(m.name),
+    const firstTub = viewer.model.materials.find(
+      (m) => m.name === "tub" || m.name === "Tub",
     );
 
     if (firstLid && !lidColorManualSet && !lidTransparencyManualSet) {
@@ -150,10 +150,11 @@ window.addEventListener("DOMContentLoaded", () => {
         const srcText = viewer.src?.toLowerCase() || "";
         const isSweetBoxTE = altText.includes("sweet box te") || altText.includes("sweet box tamper") || srcText.includes("sweet_box_te") || srcText.includes("sweet-box-te");
         
+        const isWhiteLabel = matNameLower.includes("white_label");
         const isTubTag =
           TubTextureMaterials.some((n) =>
             matNameLower.includes(n.toLowerCase()),
-          ) || (isSweetBoxTE && matNameLower.includes("white_label"));
+          ) || (isSweetBoxTE && isWhiteLabel);
             
         const isLidTag = LidTextureMaterials.some((n) =>
           matNameLower.includes(n.toLowerCase()),
@@ -177,9 +178,9 @@ window.addEventListener("DOMContentLoaded", () => {
             ? !!currentTubTextureDataURL
             : !!currentLidTextureDataURL;
 
-          // If it's a "white_label" on TE, it never receives the tub texture upload, so if we're removing defaults, it must ALWAYS be hidden.
-          const isWhiteLabelTE = isSweetBoxTE && matNameLower.includes("white_label");
-          const shouldHide = isRemovingDefault && (!hasUserTexture || isWhiteLabelTE);
+          // When "Remove Default Design" is enabled, hide default textures and stickers.
+          // For Sweet Box TE, we hide both the label and sticker simultaneously.
+          const shouldHide = isRemovingDefault && (isSweetBoxTE || !hasUserTexture);
 
           if (shouldHide) {
               if (mat.pbrMetallicRoughness.baseColorTexture) {
