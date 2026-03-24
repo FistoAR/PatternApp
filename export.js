@@ -15,6 +15,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const scrollLeftBtn = document.getElementById("scrollLeftBtn");
   const scrollRightBtn = document.getElementById("scrollRightBtn");
   const rotationAngleInput = document.getElementById("rotationAngle");
+  const goBtn = document.getElementById("goBtn");
   const copyToAllBtn = document.getElementById("copyToAllBtn");
 
   // Transparency Checkboxes
@@ -670,21 +671,26 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // Model Rotation Controls
+  function applyRotationFromAngle() {
+    if (!modelViewer || !rotationAngleInput) return;
+    const val = rotationAngleInput.value;
+    const parts = val.split(/[ ,/]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const h = parseFloat(parts[0]) || 0;
+      const v = parseFloat(parts[1]) || 0;
+      const orbit = modelViewer.getCameraOrbit();
+      modelViewer.cameraOrbit = `${h}deg ${v}deg ${orbit.radius}m`;
+    } else if (parts.length === 1) {
+      const h = parseFloat(parts[0]) || 0;
+      const orbit = modelViewer.getCameraOrbit();
+      modelViewer.cameraOrbit = `${h}deg ${orbit.phi}rad ${orbit.radius}m`;
+    }
+  }
+
   if (rotationAngleInput) {
-    rotationAngleInput.addEventListener("input", (e) => {
-      if (modelViewer) {
-        const val = e.target.value;
-        const parts = val.split(/[ ,/]+/).filter(Boolean);
-        if (parts.length >= 2) {
-          const h = parseFloat(parts[0]) || 0;
-          const v = parseFloat(parts[1]) || 0;
-          const orbit = modelViewer.getCameraOrbit();
-          modelViewer.cameraOrbit = `${h}deg ${v}deg ${orbit.radius}m`;
-        } else if (parts.length === 1) {
-          const h = parseFloat(parts[0]) || 0;
-          const orbit = modelViewer.getCameraOrbit();
-          modelViewer.cameraOrbit = `${h}deg ${orbit.phi}rad ${orbit.radius}m`;
-        }
+    rotationAngleInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        applyRotationFromAngle();
       }
     });
 
@@ -698,6 +704,11 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  if (goBtn) {
+    goBtn.addEventListener("click", applyRotationFromAngle);
+  }
+
 
   if (copyToAllBtn) {
     copyToAllBtn.addEventListener("click", () => {
