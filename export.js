@@ -149,14 +149,19 @@ window.addEventListener("DOMContentLoaded", () => {
         const matNameLower = mat.name.toLowerCase();
         const altText = viewer.getAttribute("alt")?.toLowerCase() || "";
         const srcText = viewer.src?.toLowerCase() || "";
-        const isSweetBoxTE = altText.includes("sweet box te") || altText.includes("sweet box tamper") || srcText.includes("sweet_box_te") || srcText.includes("sweet-box-te");
-        
+        const isSweetBoxTE =
+          altText.includes("sweet box te") ||
+          altText.includes("sweet box tamper") ||
+          srcText.includes("sweet_box_te") ||
+          srcText.includes("sweet-box-te");
+
         const isWhiteLabel = matNameLower.includes("white_label");
         const isTubTag =
           TubTextureMaterials.some((n) =>
             matNameLower.includes(n.toLowerCase()),
-          ) || (isSweetBoxTE && isWhiteLabel);
-            
+          ) ||
+          (isSweetBoxTE && isWhiteLabel);
+
         const isLidTag = LidTextureMaterials.some((n) =>
           matNameLower.includes(n.toLowerCase()),
         );
@@ -181,54 +186,56 @@ window.addEventListener("DOMContentLoaded", () => {
 
           // When "Remove Default Design" is enabled, hide default textures and stickers.
           // For Sweet Box TE, we hide both the label and sticker simultaneously.
-          const shouldHide = isRemovingDefault && (isSweetBoxTE || !hasUserTexture);
+          const shouldHide =
+            isRemovingDefault && (isSweetBoxTE || !hasUserTexture);
 
           if (shouldHide) {
-              if (mat.pbrMetallicRoughness.baseColorTexture) {
-                mat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
-              }
-              
-              const isCommonLabel = matNameLower.includes("tub_label") || matNameLower.includes("lid_label");
-              
-              // Ensure alpha is 0 when the design is "removed"
-              mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
-              mat.setAlphaMode("BLEND");
-              
-              if (isWhiteLabel || isCommonLabel) {
-                // To completely eliminate the "white shade" transparent ghosting,
-                // we must also turn off specular reflections and emissions for these specific tags
-                mat.pbrMetallicRoughness.setMetallicFactor(0);
-                mat.pbrMetallicRoughness.setRoughnessFactor(1);
-                mat.setEmissiveFactor([0, 0, 0]);
-              }
-              
-            } else if (!hasUserTexture) {
-              // Restore from cache
-              const defaults = originalMaterialsCache.get(mat);
-              if (defaults) {
-                if (
-                  mat.pbrMetallicRoughness.baseColorTexture &&
-                  defaults.originalTexture
-                ) {
-                  mat.pbrMetallicRoughness.baseColorTexture.setTexture(
-                    defaults.originalTexture,
-                  );
-                }
-                // Restore original appearance
-                mat.pbrMetallicRoughness.setBaseColorFactor(
-                  defaults.baseColorFactor,
+            if (mat.pbrMetallicRoughness.baseColorTexture) {
+              mat.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+            }
+
+            const isCommonLabel =
+              matNameLower.includes("tub_label") ||
+              matNameLower.includes("lid_label");
+
+            // Ensure alpha is 0 when the design is "removed"
+            mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
+            mat.setAlphaMode("BLEND");
+
+            if (isWhiteLabel || isCommonLabel) {
+              // To completely eliminate the "white shade" transparent ghosting,
+              // we must also turn off specular reflections and emissions for these specific tags
+              mat.pbrMetallicRoughness.setMetallicFactor(0);
+              mat.pbrMetallicRoughness.setRoughnessFactor(1);
+              mat.setEmissiveFactor([0, 0, 0]);
+            }
+          } else if (!hasUserTexture) {
+            // Restore from cache
+            const defaults = originalMaterialsCache.get(mat);
+            if (defaults) {
+              if (
+                mat.pbrMetallicRoughness.baseColorTexture &&
+                defaults.originalTexture
+              ) {
+                mat.pbrMetallicRoughness.baseColorTexture.setTexture(
+                  defaults.originalTexture,
                 );
-                mat.setAlphaMode(defaults.alphaMode);
-                mat.pbrMetallicRoughness.setMetallicFactor(
-                  defaults.metallicFactor,
-                );
-                mat.pbrMetallicRoughness.setRoughnessFactor(
-                  defaults.roughnessFactor,
-                );
-                mat.setEmissiveFactor(defaults.emissiveFactor);
               }
+              // Restore original appearance
+              mat.pbrMetallicRoughness.setBaseColorFactor(
+                defaults.baseColorFactor,
+              );
+              mat.setAlphaMode(defaults.alphaMode);
+              mat.pbrMetallicRoughness.setMetallicFactor(
+                defaults.metallicFactor,
+              );
+              mat.pbrMetallicRoughness.setRoughnessFactor(
+                defaults.roughnessFactor,
+              );
+              mat.setEmissiveFactor(defaults.emissiveFactor);
             }
           }
+        }
       });
     }
 
@@ -532,12 +539,8 @@ window.addEventListener("DOMContentLoaded", () => {
             colorArray[1] * 0.4,
             colorArray[2] * 0.4,
           ]);
-          mat.pbrMetallicRoughness.setMetallicFactor(
-            colorHex ? 0.8 : defaults.metallicFactor,
-          );
-          mat.pbrMetallicRoughness.setRoughnessFactor(
-            colorHex ? 0.18 : defaults.roughnessFactor,
-          );
+          mat.pbrMetallicRoughness.setMetallicFactor(defaults.metallicFactor);
+          mat.pbrMetallicRoughness.setRoughnessFactor(defaults.roughnessFactor);
           mat.setAlphaMode("BLEND");
         } else if (colorHex) {
           // Applying Manual Opaque Color
@@ -545,13 +548,8 @@ window.addEventListener("DOMContentLoaded", () => {
           mat.pbrMetallicRoughness.setBaseColorFactor([...colorArray, 1]);
           mat.setEmissiveFactor([0, 0, 0]);
 
-          if (colorHex.toLowerCase() === "#ffffff") {
-            mat.pbrMetallicRoughness.setMetallicFactor(1.0);
-            mat.pbrMetallicRoughness.setRoughnessFactor(0.39); // Premium White look (restored)
-          } else {
-            mat.pbrMetallicRoughness.setMetallicFactor(0.0);
-            mat.pbrMetallicRoughness.setRoughnessFactor(1.0);
-          }
+          mat.pbrMetallicRoughness.setMetallicFactor(defaults.metallicFactor);
+          mat.pbrMetallicRoughness.setRoughnessFactor(defaults.roughnessFactor);
           mat.setAlphaMode("OPAQUE");
         } else {
           // RESET: Back to original GLB defaults
@@ -708,7 +706,6 @@ window.addEventListener("DOMContentLoaded", () => {
   if (goBtn) {
     goBtn.addEventListener("click", applyRotationFromAngle);
   }
-
 
   if (copyToAllBtn) {
     copyToAllBtn.addEventListener("click", () => {
